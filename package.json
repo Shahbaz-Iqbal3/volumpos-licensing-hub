@@ -1,0 +1,20 @@
+{
+  "name": "volumpos-licensing-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Developer-owned licensing hub for the VolumPOS product family: license issuance, activation, and subscription renewal.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@volumpos/license": "git+https://github.com/Shahbaz-Iqbal3/volumpos-license.git#v0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3",
+    "vitest": "^2.1.9"
+  }
+}

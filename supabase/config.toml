@@ -1,0 +1,30 @@
+# Supabase project configuration for the VolumPOS Licensing Hub.
+# `project_id` is a local label; `supabase link` binds to the real project ref.
+
+project_id = "volumpos-licensing-hub"
+
+[api]
+enabled = true
+# The Hub has no public schema consumers; everything goes through functions.
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = false
+
+[functions.activate]
+verify_jwt = false
+
+[functions.renew]
+verify_jwt = false
+
+# /verify and /admin are protected by LICENSE_ADMIN_SECRET in code.
+[functions.verify]
+verify_jwt = false
+
+[functions.admin]
+verify_jwt = false

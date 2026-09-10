@@ -1,0 +1,19 @@
+/** Extra days added to a subscription license beyond its billing cycle, so a
+ *  customer who is offline at renewal time keeps working through the gap. */
+export const SUBSCRIPTION_BUFFER_DAYS = 7
+
+/** Default machines per license when the license row does not say. */
+export const DEFAULT_ACTIVATION_LIMIT = 1
+
+export const PRODUCTS = ['FABRIC_POS', 'RESTAURANT_POS'] as const
+
+/** Products the hub will issue for. */
+export function isKnownProduct(product: string): boolean {
+  return (PRODUCTS as readonly string[]).includes(product)
+}
+
+/** Fraction of fingerprint sources that must match on re-activation. Mirrors
+ *  the client package: half, rounded up, minimum 1. */
+export function requiredSourceMatches(count: number): number {
+  return Math.max(1, Math.ceil(count * 0.5))
+}
