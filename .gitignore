@@ -1,7 +1,12 @@
 node_modules/
 .env
 .env.*
+!.env.example
 *.log
 .DS_Store
 .supabase/
 supabase/.temp/
+
+# Generated from .env by `npm run config`; contains the hub URL, not secrets,
+# but is still build output rather than source.
+config.js

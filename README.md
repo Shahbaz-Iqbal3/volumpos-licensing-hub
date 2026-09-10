@@ -117,14 +117,80 @@ supabase functions deploy activate renew verify admin --no-verify-jwt
 `--no-verify-jwt` is required: products call these without a Supabase user
 session. Safety comes from the purchase key / admin secret, not JWT.
 
-### 5. Open the admin panel
+### 5. Configure and open the admin panel
 
-Serve `admin.html` locally (it is static) and point it at:
+The panel is static. Its base URL comes from `.env`, via a generated
+`config.js` (a browser cannot read `.env` directly):
 
-- Hub base URL: `https://<ref>.supabase.co/functions/v1`
-- Admin secret: the `LICENSE_ADMIN_SECRET` value
+```bash
+cp .env.example .env      # then set HUB_URL
+npm run config            # writes config.js from .env (gitignored)
+```
+
+Then serve the folder and open `admin.html`:
+
+```bash
+npx serve .
+```
+
+The **Hub base URL** field is pre-filled from `config.js` and stays editable so
+a staging hub can be targeted without a rebuild. The **Admin secret** is always
+typed by the operator and kept in `sessionStorage` — it is never written to
+`config.js` or any other served file.
 
 Then create a customer, issue a license, and copy the one-time key.
+
+> ⚠️ **Never put the admin secret in `.env` or `config.js`.** Everything the
+> panel serves is public. `.env` holds the URL only.
+
+---
+
+## Deploying the admin panel online
+
+The hub endpoint is already reachable from the internet (that is what lets
+products activate). Hosting the panel publicly therefore does not expose a new
+secret — the page contains none — but it does add **discoverability**, so the
+hardening below matters.
+
+### Current protections
+
+- `/admin` and `/verify` require the `x-admin-secret` header, compared in
+  constant time.
+- Repeated failures from one IP are throttled (20 per 15 min, then HTTP 429).
+  Throttling applies **after** the secret check, so a valid operator is never
+  locked out by someone else's attempts on the same IP.
+- Every attempt is recorded in `checkin_log` (`action = 'admin-auth'`).
+
+### Recommended: put an auth gate in front
+
+Do not rely on the shared secret alone for a public URL. Front the static panel
+with an identity layer:
+
+- **Cloudflare Access** (or a Cloudflare Tunnel with Zero Trust) — no code
+  changes, add an email/SSO policy.
+- **Vercel Password Protection / Deployment Protection** — one toggle for a
+  Vercel-hosted panel.
+- **Netlify password protection** for Netlify-hosted panels.
+
+Then narrow CORS so only that origin may call the hub:
+
+```bash
+supabase secrets set ADMIN_ALLOWED_ORIGIN="https://admin.example.com"
+```
+
+`ADMIN_ALLOWED_ORIGIN` accepts a comma-separated list. When unset, CORS stays
+open (`*`), which is fine for local development. CORS is a browser-side control
+only — it does not stop scripts — so it complements, never replaces, the secret
+and the auth gate.
+
+### Checklist before going public
+
+- [ ] Rotate `LICENSE_ADMIN_SECRET` (assume any value ever pasted into a chat,
+      ticket, or commit is burned).
+- [ ] Set `ADMIN_ALLOWED_ORIGIN` to the panel's exact origin.
+- [ ] Put Cloudflare Access / Vercel / Netlify protection in front.
+- [ ] Confirm `.env` and `config.js` are gitignored and contain no secret.
+- [ ] Verify a correct secret works and a wrong one returns 403.
 
 ## Product-side contract
 

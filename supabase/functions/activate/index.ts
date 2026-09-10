@@ -17,8 +17,8 @@ import { sanitizeSources, signLicensePayload } from '../_shared/licenseSign.ts'
 import { decideActivation, resolveEntitlement } from '../_shared/logic.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return methodNotAllowed()
+  if (req.method === 'OPTIONS') return preflight(req)
+  if (req.method !== 'POST') return methodNotAllowed(req)
 
   const ip = clientIp(req)
   const db = serviceClient()

@@ -6,22 +6,37 @@
 //
 // Accepts either { license_key } (hashes it) or { license_id } / { customer_id }.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { json, preflight, methodNotAllowed, clientIp } from '../_shared/http.ts'
+import { json, preflight, methodNotAllowed, clientIp, timingSafeEqual } from '../_shared/http.ts'
 import { serviceClient, adminSecret, logCheckin } from '../_shared/db.ts'
+import { checkAdminRateLimit, recordAdminAuthFailure } from '../_shared/ratelimit.ts'
 import { hashLicenseKey } from '../_shared/keys.ts'
 import { resolveEntitlement } from '../_shared/logic.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return methodNotAllowed()
+  if (req.method === 'OPTIONS') return preflight(req)
+  if (req.method !== 'POST') return methodNotAllowed(req)
 
   const ip = clientIp(req)
+  const db = serviceClient()
+
+  // Check the secret FIRST; throttling applies to failures only, so a valid
+  // operator is never locked out by someone else's attempts on the same IP.
   const secret = adminSecret()
-  if (!secret || req.headers.get('x-admin-secret') !== secret) {
-    return json({ error: 'Forbidden' }, 403)
+  const provided = req.headers.get('x-admin-secret') ?? ''
+  if (!secret || !timingSafeEqual(provided, secret)) {
+    const limit = await checkAdminRateLimit(db, ip)
+    if (!limit.allowed) {
+      return json(
+        { error: `Too many failed attempts. Try again in ${limit.retryAfterMinutes} minutes.` },
+        429,
+        req
+      )
+    }
+    await recordAdminAuthFailure(db, ip, 'bad admin secret')
+    return json({ error: 'Forbidden' }, 403, req)
   }
 
-  const db = serviceClient()
+  const respond = (body: unknown, status = 200): Response => json(body, status, req)
 
   try {
     const body: any = await req.json().catch(() => null)
@@ -30,7 +45,7 @@ serve(async (req) => {
     const customerId = typeof body?.customer_id === 'string' ? body.customer_id : null
 
     if (!rawKey && !licenseId && !customerId) {
-      return json({ error: 'Provide license_key, license_id or customer_id' }, 400)
+      return respond({ error: 'Provide license_key, license_id or customer_id' }, 400)
     }
 
     let query = db.from('licenses').select('*')
@@ -41,7 +56,7 @@ serve(async (req) => {
     const { data: rows, error } = await query
     if (error) {
       await logCheckin(db, { action: 'verify', result: 'denied', reason: error.message, ip })
-      return json({ error: 'Lookup failed' }, 500)
+      return respond({ error: 'Lookup failed' }, 500)
     }
 
     const licenses = rows ?? []
@@ -100,8 +115,8 @@ serve(async (req) => {
     }
 
     await logCheckin(db, { action: 'verify', result: 'ok', reason: rawKey ? 'by key' : 'by id', ip })
-    return json({ ok: true, count: results.length, results })
+    return respond({ ok: true, count: results.length, results })
   } catch (err) {
-    return json({ error: 'Verify unavailable', detail: String((err as Error)?.message ?? err) }, 500)
+    return respond({ error: 'Verify unavailable', detail: String((err as Error)?.message ?? err) }, 500)
   }
 })

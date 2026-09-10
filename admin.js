@@ -22,9 +22,14 @@ function showError(message) {
   box.classList.remove('hidden')
 }
 
+// Base URL from the generated config.js (built from .env). Falls back to the
+// input field, which stays editable so a staging hub can be targeted without a
+// rebuild. The admin secret is NEVER read from config — it is operator-entered.
+const DEFAULT_BASE_URL = (window.VOLUMPOS_HUB && window.VOLUMPOS_HUB.baseUrl) || ''
+
 function config() {
   return {
-    baseUrl: (el('baseUrl').value || '').trim().replace(/\/+$/, ''),
+    baseUrl: (el('baseUrl').value || DEFAULT_BASE_URL || '').trim().replace(/\/+$/, ''),
     secret: el('adminSecret').value || ''
   }
 }
@@ -36,9 +41,13 @@ function persistConfig() {
 }
 
 function restoreConfig() {
+  // Seed the base URL from the generated config so it is pre-filled on load.
+  if (DEFAULT_BASE_URL) el('baseUrl').value = DEFAULT_BASE_URL
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null')
     if (saved?.baseUrl) el('baseUrl').value = saved.baseUrl
+    // The secret is deliberately NOT persisted anywhere durable — sessionStorage
+    // only, so it dies with the tab.
     if (saved?.secret) el('adminSecret').value = saved.secret
   } catch {}
 }

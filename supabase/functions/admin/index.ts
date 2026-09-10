@@ -20,8 +20,9 @@
 // The raw purchase key is returned exactly once, at `create-license`. Only its
 // hash and last four characters are stored.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { json, preflight, methodNotAllowed, clientIp } from '../_shared/http.ts'
+import { json, preflight, methodNotAllowed, clientIp, timingSafeEqual } from '../_shared/http.ts'
 import { serviceClient, adminSecret, logCheckin } from '../_shared/db.ts'
+import { checkAdminRateLimit, recordAdminAuthFailure } from '../_shared/ratelimit.ts'
 import { generateLicenseKey, hashLicenseKey, keyLast4, productTag } from '../_shared/keys.ts'
 import { addMonths } from '../_shared/licenseSign.ts'
 import { isKnownProduct, DEFAULT_ACTIVATION_LIMIT } from '../_shared/constants.ts'
@@ -36,16 +37,33 @@ async function nextId(db: ReturnType<typeof serviceClient>, prefix: string, coun
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return methodNotAllowed()
+  if (req.method === 'OPTIONS') return preflight(req)
+  if (req.method !== 'POST') return methodNotAllowed(req)
 
   const ip = clientIp(req)
+  const db = serviceClient()
+
+  // Check the secret FIRST. Throttling is only applied to failures, so a valid
+  // operator can never be locked out by someone else's attempts from the same
+  // (possibly shared, possibly NAT'd) IP.
   const secret = adminSecret()
-  if (!secret || req.headers.get('x-admin-secret') !== secret) {
-    return json({ error: 'Forbidden' }, 403)
+  const provided = req.headers.get('x-admin-secret') ?? ''
+  if (!secret || !timingSafeEqual(provided, secret)) {
+    const limit = await checkAdminRateLimit(db, ip)
+    if (!limit.allowed) {
+      return json(
+        { error: `Too many failed attempts. Try again in ${limit.retryAfterMinutes} minutes.` },
+        429,
+        req
+      )
+    }
+    await recordAdminAuthFailure(db, ip, 'bad admin secret')
+    return json({ error: 'Forbidden' }, 403, req)
   }
 
-  const db = serviceClient()
+  // Bind the request so every response carries the correct CORS origin
+  // without threading `req` through each return.
+  const respond = (body: unknown, status = 200): Response => json(body, status, req)
 
   try {
     const body: any = await req.json().catch(() => null)
@@ -54,7 +72,7 @@ serve(async (req) => {
     switch (action) {
       case 'create-customer': {
         const name = typeof body.name === 'string' ? body.name.trim() : ''
-        if (!name) return json({ error: 'name is required' }, 400)
+        if (!name) return respond({ error: 'name is required' }, 400)
         const id = await nextId(db, 'CUST-', 'customer', 4)
         const { error } = await db.from('customers').insert({
           id,
@@ -63,23 +81,23 @@ serve(async (req) => {
           email: body.email ?? null,
           notes: body.notes ?? null
         })
-        if (error) return json({ error: error.message }, 500)
+        if (error) return respond({ error: error.message }, 500)
         await logCheckin(db, { action: 'admin', result: 'ok', reason: `create-customer ${id}`, ip })
-        return json({ ok: true, customer_id: id })
+        return respond({ ok: true, customer_id: id })
       }
 
       case 'list-customers': {
         const { data, error } = await db.from('customers').select('*').order('created_at', { ascending: false })
-        if (error) return json({ error: error.message }, 500)
-        return json({ ok: true, customers: data ?? [] })
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true, customers: data ?? [] })
       }
 
       case 'create-license': {
         const customerId = typeof body.customer_id === 'string' ? body.customer_id : ''
         const product = typeof body.product === 'string' ? body.product : ''
         const licenseType = body.license_type === 'subscription' ? 'subscription' : 'perpetual'
-        if (!customerId || !product) return json({ error: 'customer_id and product are required' }, 400)
-        if (!isKnownProduct(product)) return json({ error: `Unknown product ${product}` }, 400)
+        if (!customerId || !product) return respond({ error: 'customer_id and product are required' }, 400)
+        if (!isKnownProduct(product)) return respond({ error: `Unknown product ${product}` }, 400)
 
         const activationLimit = Math.max(1, Math.floor(Number(body.activation_limit) || DEFAULT_ACTIVATION_LIMIT))
         const features = Array.isArray(body.features) ? body.features.filter((f: unknown) => typeof f === 'string') : []
@@ -92,7 +110,7 @@ serve(async (req) => {
         let expiresAt: string | null = null
         if (typeof body.expires_at === 'string' && body.expires_at) {
           const parsed = new Date(body.expires_at)
-          if (isNaN(parsed.getTime())) return json({ error: 'expires_at is not a valid date' }, 400)
+          if (isNaN(parsed.getTime())) return respond({ error: 'expires_at is not a valid date' }, 400)
           expiresAt = parsed.toISOString()
         } else if (licenseType === 'subscription') {
           const months = durationMonths ?? 1
@@ -122,10 +140,10 @@ serve(async (req) => {
           expires_at: expiresAt,
           subscription_id: subscriptionId
         })
-        if (error) return json({ error: error.message }, 500)
+        if (error) return respond({ error: error.message }, 500)
 
         await logCheckin(db, { action: 'admin', result: 'ok', reason: `create-license ${id}`, ip })
-        return json({
+        return respond({
           ok: true,
           license_id: id,
           license_key: rawKey,
@@ -137,27 +155,27 @@ serve(async (req) => {
         let query = db.from('licenses').select('*').order('issued_at', { ascending: false })
         if (typeof body.customer_id === 'string') query = query.eq('customer_id', body.customer_id)
         const { data, error } = await query
-        if (error) return json({ error: error.message }, 500)
-        return json({ ok: true, licenses: data ?? [] })
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true, licenses: data ?? [] })
       }
 
       case 'set-license-status': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         const status = typeof body.status === 'string' ? body.status : ''
         const allowed = ['unactivated', 'active', 'suspended', 'expired', 'revoked']
-        if (!licenseId || !allowed.includes(status)) return json({ error: 'license_id and a valid status are required' }, 400)
+        if (!licenseId || !allowed.includes(status)) return respond({ error: 'license_id and a valid status are required' }, 400)
         const { error } = await db.from('licenses').update({ status }).eq('id', licenseId)
-        if (error) return json({ error: error.message }, 500)
-        return json({ ok: true })
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
       }
 
       case 'set-activation-limit': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         const limit = Math.max(1, Math.floor(Number(body.activation_limit) || 1))
-        if (!licenseId) return json({ error: 'license_id is required' }, 400)
+        if (!licenseId) return respond({ error: 'license_id is required' }, 400)
         const { error } = await db.from('licenses').update({ activation_limit: limit }).eq('id', licenseId)
-        if (error) return json({ error: error.message }, 500)
-        return json({ ok: true })
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
       }
 
       case 'create-subscription': {
@@ -165,7 +183,7 @@ serve(async (req) => {
         const product = typeof body.product === 'string' ? body.product : ''
         const months = Math.floor(Number(body.billing_cycle_months))
         if (!customerId || !product || !Number.isFinite(months) || months <= 0) {
-          return json({ error: 'customer_id, product and billing_cycle_months are required' }, 400)
+          return respond({ error: 'customer_id, product and billing_cycle_months are required' }, 400)
         }
         const { data, error } = await db
           .from('subscriptions')
@@ -180,20 +198,20 @@ serve(async (req) => {
           })
           .select('id')
           .maybeSingle()
-        if (error) return json({ error: error.message }, 500)
-        return json({ ok: true, subscription_id: data?.id })
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true, subscription_id: data?.id })
       }
 
       case 'set-subscription': {
         const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
-        if (!subscriptionId) return json({ error: 'subscription_id is required' }, 400)
+        if (!subscriptionId) return respond({ error: 'subscription_id is required' }, 400)
         const update: Record<string, unknown> = {}
         if (typeof body.status === 'string') update.status = body.status
         if (typeof body.next_billing_date === 'string') update.next_billing_date = body.next_billing_date
         if (body.status === 'cancelled') update.cancelled_at = new Date().toISOString()
         const { error } = await db.from('subscriptions').update(update).eq('id', subscriptionId)
-        if (error) return json({ error: error.message }, 500)
-        return json({ ok: true })
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
       }
 
       case 'stats': {
@@ -208,7 +226,7 @@ serve(async (req) => {
         for (const row of byProduct ?? []) {
           productCounts[row.product] = (productCounts[row.product] || 0) + 1
         }
-        return json({
+        return respond({
           ok: true,
           customers: customers ?? 0,
           licenses: licenses ?? 0,
@@ -219,9 +237,9 @@ serve(async (req) => {
       }
 
       default:
-        return json({ error: `Unknown action: ${action || '(none)'}` }, 400)
+        return respond({ error: `Unknown action: ${action || '(none)'}` }, 400)
     }
   } catch (err) {
-    return json({ error: 'Admin request failed', detail: String((err as Error)?.message ?? err) }, 500)
+    return respond({ error: 'Admin request failed', detail: String((err as Error)?.message ?? err) }, 500)
   }
 })

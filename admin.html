@@ -95,6 +95,9 @@
     <p class="text-xs text-slate-600">Keep the admin secret out of source control. This page is for internal use only.</p>
   </div>
 
+  <!-- Generated from .env by `npm run config`. Contains the hub base URL only
+       (no secrets). Loaded before admin.js; if absent, the URL field is used. -->
+  <script src="config.js" onerror="void 0"></script>
   <script src="admin.js"></script>
 </body>
 </html>

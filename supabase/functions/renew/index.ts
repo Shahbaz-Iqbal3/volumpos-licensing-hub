@@ -16,8 +16,8 @@ import { resolveEntitlement, nextRenewalExpiry } from '../_shared/logic.ts'
 import { SUBSCRIPTION_BUFFER_DAYS } from '../_shared/constants.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return preflight()
-  if (req.method !== 'POST') return methodNotAllowed()
+  if (req.method === 'OPTIONS') return preflight(req)
+  if (req.method !== 'POST') return methodNotAllowed(req)
 
   const ip = clientIp(req)
   const db = serviceClient()
