@@ -1,103 +1,106 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VolumPOS Licensing Hub</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VolumPOS Licensing</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js" onerror="void 0"></script>
   <style>
-    body { background: #0f172a; }
-    .card { background: #1e293b; border: 1px solid #334155; }
-    input, select { background: #0f172a; border: 1px solid #334155; }
-    pre { white-space: pre-wrap; word-break: break-all; }
+    :root { color-scheme: dark; }
+    body { background: #08111f; }
+    .panel { background: rgba(15, 29, 49, .86); border: 1px solid #203452; }
+    input, select, textarea { background: #0a1729 !important; border-color: #29405f !important; }
+    input:focus, select:focus, textarea:focus { border-color: #36d1b4 !important; outline: none; box-shadow: 0 0 0 2px rgba(54,209,180,.15); }
+    .tab.active { color: #5eead4; border-bottom-color: #2dd4bf; }
   </style>
 </head>
-<body class="text-slate-200 min-h-screen">
-  <div class="max-w-5xl mx-auto p-4 sm:p-6">
-    <header class="mb-6">
-      <h1 class="text-xl font-semibold text-slate-100">VolumPOS Licensing Hub</h1>
-      <p class="text-xs text-slate-500">Internal admin. Talks to the <code>/admin</code> Edge Function.</p>
-    </header>
-
-    <div class="card rounded-lg p-4 mb-6 grid sm:grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs text-slate-400 mb-1">Hub base URL</label>
-        <input id="baseUrl" class="w-full rounded-md px-3 py-2 text-sm" placeholder="https://<ref>.supabase.co/functions/v1" />
-      </div>
-      <div>
-        <label class="block text-xs text-slate-400 mb-1">Admin secret</label>
-        <input id="adminSecret" type="password" class="w-full rounded-md px-3 py-2 text-sm" placeholder="LICENSE_ADMIN_SECRET" />
-      </div>
-      <div class="sm:col-span-2">
-        <button id="loadStats" class="px-3 py-2 rounded-md bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium">Refresh stats</button>
-      </div>
-    </div>
-
-    <div id="error" class="hidden card rounded-lg p-3 mb-4 text-red-300 text-sm"></div>
-
-    <section class="mb-8">
-      <h2 class="text-sm uppercase tracking-wide text-slate-400 mb-3">Overview</h2>
-      <div id="stats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
-    </section>
-
-    <section class="mb-8 grid lg:grid-cols-2 gap-4">
-      <div class="card rounded-lg p-4 space-y-3">
-        <h2 class="text-sm font-semibold text-slate-200">New customer</h2>
-        <input id="custName" class="w-full rounded-md px-3 py-2 text-sm" placeholder="Business name" />
-        <input id="custPhone" class="w-full rounded-md px-3 py-2 text-sm" placeholder="Phone (optional)" />
-        <input id="custEmail" class="w-full rounded-md px-3 py-2 text-sm" placeholder="Email (optional)" />
-        <button id="createCustomer" class="w-full px-3 py-2 rounded-md bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium">Create customer</button>
-      </div>
-
-      <div class="card rounded-lg p-4 space-y-3">
-        <h2 class="text-sm font-semibold text-slate-200">Issue license</h2>
-        <input id="licCustomer" class="w-full rounded-md px-3 py-2 text-sm" placeholder="Customer id (CUST-0001)" />
-        <select id="licProduct" class="w-full rounded-md px-3 py-2 text-sm">
-          <option value="RESTAURANT_POS">RESTAURANT_POS</option>
-          <option value="FABRIC_POS">FABRIC_POS</option>
-        </select>
-        <select id="licType" class="w-full rounded-md px-3 py-2 text-sm">
-          <option value="perpetual">perpetual (one-time term)</option>
-          <option value="subscription">subscription</option>
-        </select>
-        <select id="licTier" class="w-full rounded-md px-3 py-2 text-sm">
-          <option value="1y">1 year</option>
-          <option value="2y">2 years</option>
-          <option value="5y">5 years</option>
-          <option value="">no tier (use explicit date)</option>
-        </select>
-        <input id="licExpiry" type="date" class="w-full rounded-md px-3 py-2 text-sm" />
-        <input id="licLimit" type="number" min="1" value="1" class="w-full rounded-md px-3 py-2 text-sm" placeholder="Activation limit" />
-        <button id="createLicense" class="w-full px-3 py-2 rounded-md bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium">Issue license key</button>
-        <div id="licenseResult" class="hidden space-y-2">
-          <div class="text-xs text-slate-400">License key (shown once):</div>
-          <pre id="licenseKey" class="text-xs bg-slate-900 border border-slate-700 rounded-md p-2 text-teal-300"></pre>
-          <button id="copyLicense" class="text-xs px-2 py-1 rounded-md bg-slate-700 hover:bg-slate-600">Copy</button>
+<body class="min-h-screen text-slate-200">
+  <main class="max-w-7xl mx-auto p-4 sm:p-8">
+    <section id="login" class="min-h-[80vh] flex items-center justify-center">
+      <div class="panel rounded-2xl p-7 w-full max-w-md shadow-2xl shadow-cyan-950/20">
+        <div class="mb-8">
+          <div class="text-xs uppercase tracking-[.25em] text-teal-400 mb-3">VolumPOS</div>
+          <h1 class="text-2xl font-semibold text-white">Licensing Hub</h1>
+          <p class="text-sm text-slate-400 mt-2">Secure operator sign-in</p>
         </div>
+        <label class="block text-xs text-slate-400 mb-2">Hub URL</label>
+        <input id="loginUrl" class="w-full rounded-lg px-3 py-2.5 text-sm mb-4" autocomplete="url">
+        <label class="block text-xs text-slate-400 mb-2">Admin secret</label>
+        <input id="loginSecret" type="password" class="w-full rounded-lg px-3 py-2.5 text-sm" autocomplete="current-password" autofocus>
+        <button id="loginButton" class="mt-5 w-full rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold py-2.5">Sign in</button>
+        <p id="loginError" class="hidden text-sm text-red-300 mt-3"></p>
+        <p class="text-[11px] text-slate-500 mt-6">The secret is kept in this browser tab only. It is never part of the deployed files.</p>
       </div>
     </section>
 
-    <section class="mb-8">
-      <h2 class="text-sm uppercase tracking-wide text-slate-400 mb-3">Licenses</h2>
-      <div class="card rounded-lg overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="text-slate-400 text-left">
-            <tr class="border-b border-slate-700">
-              <th class="p-3">Id</th><th class="p-3">Customer</th><th class="p-3">Product</th>
-              <th class="p-3">Type</th><th class="p-3">Status</th><th class="p-3">Expires</th><th class="p-3">Limit</th>
-            </tr>
-          </thead>
-          <tbody id="licenses" class="divide-y divide-slate-800"></tbody>
-        </table>
-      </div>
+    <section id="dashboard" class="hidden">
+      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-7">
+        <div>
+          <div class="text-xs uppercase tracking-[.25em] text-teal-400 mb-2">VolumPOS</div>
+          <h1 class="text-3xl font-semibold text-white">Licensing Hub</h1>
+          <p class="text-sm text-slate-400 mt-1">Customers, entitlements, and subscription control</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="refresh" class="px-3 py-2 rounded-lg panel text-sm hover:border-teal-400">Refresh</button>
+          <button id="signOut" class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:bg-slate-800">Sign out</button>
+        </div>
+      </header>
+      <div id="error" class="hidden rounded-lg border border-red-900 bg-red-950/40 p-3 mb-5 text-sm text-red-200"></div>
+      <div id="stats" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8"></div>
+
+      <nav class="flex gap-5 border-b border-slate-800 mb-6">
+        <button class="tab active pb-3 border-b-2 border-transparent text-sm" data-tab="customers">Customers</button>
+        <button class="tab pb-3 border-b-2 border-transparent text-sm text-slate-400" data-tab="licenses">Licenses</button>
+        <button class="tab pb-3 border-b-2 border-transparent text-sm text-slate-400" data-tab="subscriptions">Subscriptions</button>
+      </nav>
+
+      <section id="customersTab" class="tab-page">
+        <div class="panel rounded-xl p-4 mb-4">
+          <h2 class="font-semibold mb-3">Create customer</h2>
+          <form id="customerForm" class="grid md:grid-cols-4 gap-3">
+            <input id="customerName" required class="rounded-lg px-3 py-2 text-sm" placeholder="Business name">
+            <input id="customerPhone" class="rounded-lg px-3 py-2 text-sm" placeholder="Phone">
+            <input id="customerEmail" type="email" class="rounded-lg px-3 py-2 text-sm" placeholder="Email">
+            <button class="rounded-lg bg-teal-500 text-slate-950 font-semibold text-sm">Create customer</button>
+          </form>
+        </div>
+        <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Phone</th><th class="p-3">Email</th><th class="p-3">Actions</th></tr></thead><tbody id="customers"></tbody></table></div>
+      </section>
+
+      <section id="licensesTab" class="tab-page hidden">
+        <div class="panel rounded-xl p-4 mb-4">
+          <h2 class="font-semibold mb-3">Issue license</h2>
+          <form id="licenseForm" class="grid md:grid-cols-4 gap-3">
+            <input id="licenseCustomer" required class="rounded-lg px-3 py-2 text-sm" placeholder="Customer ID">
+            <select id="licenseProduct" class="rounded-lg px-3 py-2 text-sm"><option>RESTAURANT_POS</option><option>FABRIC_POS</option></select>
+            <select id="licenseType" class="rounded-lg px-3 py-2 text-sm"><option value="perpetual">Perpetual</option><option value="subscription">Subscription</option></select>
+            <input id="licenseTier" class="rounded-lg px-3 py-2 text-sm" placeholder="Tier: 1y / 2y / 5y">
+            <input id="licenseMonths" type="number" min="1" class="rounded-lg px-3 py-2 text-sm" placeholder="Subscription months">
+            <input id="licenseSubscription" class="rounded-lg px-3 py-2 text-sm" placeholder="Subscription UUID (optional)">
+            <input id="licenseLimit" type="number" min="1" value="1" class="rounded-lg px-3 py-2 text-sm" placeholder="Machine limit">
+            <button class="rounded-lg bg-teal-500 text-slate-950 font-semibold text-sm">Issue license</button>
+          </form>
+          <div id="issuedKey" class="hidden mt-4 rounded-lg bg-slate-950 border border-teal-900 p-3"><div class="text-xs text-slate-400">Purchase key. Copy it now; it is shown once.</div><code id="issuedKeyValue" class="block text-teal-300 mt-2 select-all"></code></div>
+        </div>
+        <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Customer</th><th class="p-3">Product</th><th class="p-3">Type</th><th class="p-3">Status</th><th class="p-3">Expires</th><th class="p-3">Limit</th><th class="p-3">Actions</th></tr></thead><tbody id="licenses"></tbody></table></div>
+      </section>
+
+      <section id="subscriptionsTab" class="tab-page hidden">
+        <div class="panel rounded-xl p-4 mb-4">
+          <h2 class="font-semibold mb-3">Create subscription</h2>
+          <form id="subscriptionForm" class="grid md:grid-cols-5 gap-3">
+            <input id="subscriptionCustomer" required class="rounded-lg px-3 py-2 text-sm" placeholder="Customer ID">
+            <select id="subscriptionProduct" class="rounded-lg px-3 py-2 text-sm"><option>RESTAURANT_POS</option><option>FABRIC_POS</option></select>
+            <input id="subscriptionMonths" required type="number" min="1" value="1" class="rounded-lg px-3 py-2 text-sm" placeholder="Cycle months">
+            <input id="subscriptionPrice" type="number" min="0" class="rounded-lg px-3 py-2 text-sm" placeholder="Price (minor PKR)">
+            <button class="rounded-lg bg-teal-500 text-slate-950 font-semibold text-sm">Create subscription</button>
+          </form>
+        </div>
+        <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Customer</th><th class="p-3">Product</th><th class="p-3">Status</th><th class="p-3">Cycle</th><th class="p-3">Next billing</th><th class="p-3">Actions</th></tr></thead><tbody id="subscriptions"></tbody></table></div>
+      </section>
     </section>
-
-    <p class="text-xs text-slate-600">Keep the admin secret out of source control. This page is for internal use only.</p>
-  </div>
-
-  <!-- Generated from .env by `npm run config`. Contains the hub base URL only
-       (no secrets). Loaded before admin.js; if absent, the URL field is used. -->
-  <script src="config.js" onerror="void 0"></script>
+  </main>
   <script src="admin.js"></script>
 </body>
 </html>

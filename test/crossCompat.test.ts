@@ -254,7 +254,7 @@ describe('entitlement', () => {
       expiresAt: '2026-10-01T00:00:00Z',
       licenseType: 'subscription',
       billingCycleMonths: 1,
-      bufferDays: 7,
+      bufferDays: 5,
       now
     })
     expect(decision.renew).toBe(false)
@@ -266,12 +266,12 @@ describe('entitlement', () => {
       expiresAt: '2026-06-03T00:00:00Z',
       licenseType: 'subscription',
       billingCycleMonths: 1,
-      bufferDays: 7,
+      bufferDays: 5,
       now
     })
     expect(decision.renew).toBe(true)
-    // 2026-06-03 + 1 month = 2026-07-03, + 7 days = 2026-07-10.
-    expect(decision.expiresAt.slice(0, 10)).toBe('2026-07-10')
+    // 2026-06-03 + 1 month = 2026-07-03, + 5 days = 2026-07-08.
+    expect(decision.expiresAt.slice(0, 10)).toBe('2026-07-08')
   })
 
   it('is idempotent on immediate retry after renewing', () => {
@@ -279,7 +279,7 @@ describe('entitlement', () => {
       expiresAt: '2026-06-03T00:00:00Z',
       licenseType: 'subscription',
       billingCycleMonths: 1,
-      bufferDays: 7,
+      bufferDays: 5,
       now
     })
     expect(first.renew).toBe(true)
@@ -287,11 +287,26 @@ describe('entitlement', () => {
       expiresAt: first.expiresAt,
       licenseType: 'subscription',
       billingCycleMonths: 1,
-      bufferDays: 7,
+      bufferDays: 5,
       now
     })
     expect(second.renew).toBe(false)
     expect(second.expiresAt).toBe(first.expiresAt)
+  })
+
+  it('reactivates from the last stored subscription end, not activation time', () => {
+    // The subscription was paused after its original period ended. On payment,
+    // an admin changes it back to active; renewal uses the stored expiry as the
+    // anchor when it is still ahead, rather than starting from activation.
+    const decision = nextRenewalExpiry({
+      expiresAt: '2026-06-03T00:00:00Z',
+      licenseType: 'subscription',
+      billingCycleMonths: 1,
+      bufferDays: 5,
+      now: new Date('2026-05-31T00:00:00Z')
+    })
+    expect(decision.renew).toBe(true)
+    expect(decision.expiresAt.slice(0, 10)).toBe('2026-07-08')
   })
 
   it('never extends a perpetual license', () => {
@@ -299,7 +314,7 @@ describe('entitlement', () => {
       expiresAt: '2026-06-03T00:00:00Z',
       licenseType: 'perpetual',
       billingCycleMonths: undefined,
-      bufferDays: 7,
+      bufferDays: 5,
       now
     })
     expect(decision.renew).toBe(false)

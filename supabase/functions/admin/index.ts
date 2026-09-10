@@ -92,6 +92,29 @@ serve(async (req) => {
         return respond({ ok: true, customers: data ?? [] })
       }
 
+      case 'update-customer': {
+        const customerId = typeof body.customer_id === 'string' ? body.customer_id : ''
+        if (!customerId) return respond({ error: 'customer_id is required' }, 400)
+        const update: Record<string, unknown> = {}
+        for (const field of ['name', 'phone', 'email', 'notes']) {
+          if (body[field] !== undefined) update[field] = body[field] === '' ? null : body[field]
+        }
+        if (!Object.keys(update).length) return respond({ error: 'No fields to update' }, 400)
+        const { error } = await db.from('customers').update(update).eq('id', customerId)
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
+      }
+
+      case 'delete-customer': {
+        const customerId = typeof body.customer_id === 'string' ? body.customer_id : ''
+        if (!customerId) return respond({ error: 'customer_id is required' }, 400)
+        const { count } = await db.from('licenses').select('*', { count: 'exact', head: true }).eq('customer_id', customerId)
+        if ((count ?? 0) > 0) return respond({ error: 'Delete or reassign this customer\'s licenses first.' }, 409)
+        const { error } = await db.from('customers').delete().eq('id', customerId)
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
+      }
+
       case 'create-license': {
         const customerId = typeof body.customer_id === 'string' ? body.customer_id : ''
         const product = typeof body.product === 'string' ? body.product : ''
@@ -159,6 +182,28 @@ serve(async (req) => {
         return respond({ ok: true, licenses: data ?? [] })
       }
 
+      case 'update-license': {
+        const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
+        if (!licenseId) return respond({ error: 'license_id is required' }, 400)
+        const update: Record<string, unknown> = {}
+        if (typeof body.status === 'string') update.status = body.status
+        if (body.activation_limit !== undefined) update.activation_limit = Math.max(1, Math.floor(Number(body.activation_limit) || 1))
+        if (body.expires_at !== undefined) update.expires_at = body.expires_at || null
+        if (body.notes !== undefined) update.notes = body.notes || null
+        if (!Object.keys(update).length) return respond({ error: 'No fields to update' }, 400)
+        const { error } = await db.from('licenses').update(update).eq('id', licenseId)
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
+      }
+
+      case 'delete-license': {
+        const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
+        if (!licenseId) return respond({ error: 'license_id is required' }, 400)
+        const { error } = await db.from('licenses').delete().eq('id', licenseId)
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
+      }
+
       case 'set-license-status': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         const status = typeof body.status === 'string' ? body.status : ''
@@ -202,14 +247,54 @@ serve(async (req) => {
         return respond({ ok: true, subscription_id: data?.id })
       }
 
+      case 'list-subscriptions': {
+        let query = db.from('subscriptions').select('*').order('created_at', { ascending: false })
+        if (typeof body.customer_id === 'string') query = query.eq('customer_id', body.customer_id)
+        const { data, error } = await query
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true, subscriptions: data ?? [] })
+      }
+
       case 'set-subscription': {
         const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
         if (!subscriptionId) return respond({ error: 'subscription_id is required' }, 400)
         const update: Record<string, unknown> = {}
-        if (typeof body.status === 'string') update.status = body.status
+        const statuses = ['active', 'past_due', 'cancelled', 'paused']
+        if (typeof body.status === 'string') {
+          if (!statuses.includes(body.status)) return respond({ error: 'Invalid subscription status' }, 400)
+          update.status = body.status
+        }
         if (typeof body.next_billing_date === 'string') update.next_billing_date = body.next_billing_date
         if (body.status === 'cancelled') update.cancelled_at = new Date().toISOString()
         const { error } = await db.from('subscriptions').update(update).eq('id', subscriptionId)
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
+      }
+
+      case 'update-subscription': {
+        const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
+        if (!subscriptionId) return respond({ error: 'subscription_id is required' }, 400)
+        const update: Record<string, unknown> = {}
+        if (typeof body.status === 'string') {
+          if (!['active', 'past_due', 'cancelled', 'paused'].includes(body.status)) return respond({ error: 'Invalid subscription status' }, 400)
+          update.status = body.status
+        }
+        if (body.billing_cycle_months !== undefined) update.billing_cycle_months = Math.max(1, Math.floor(Number(body.billing_cycle_months) || 1))
+        if (body.price_minor !== undefined) update.price_minor = body.price_minor === '' ? null : Math.floor(Number(body.price_minor))
+        if (body.next_billing_date !== undefined) update.next_billing_date = body.next_billing_date || null
+        if (body.currency !== undefined) update.currency = body.currency || 'PKR'
+        if (body.status === 'cancelled') update.cancelled_at = new Date().toISOString()
+        if (body.status === 'active') update.cancelled_at = null
+        if (!Object.keys(update).length) return respond({ error: 'No fields to update' }, 400)
+        const { error } = await db.from('subscriptions').update(update).eq('id', subscriptionId)
+        if (error) return respond({ error: error.message }, 500)
+        return respond({ ok: true })
+      }
+
+      case 'delete-subscription': {
+        const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
+        if (!subscriptionId) return respond({ error: 'subscription_id is required' }, 400)
+        const { error } = await db.from('subscriptions').delete().eq('id', subscriptionId)
         if (error) return respond({ error: error.message }, 500)
         return respond({ ok: true })
       }

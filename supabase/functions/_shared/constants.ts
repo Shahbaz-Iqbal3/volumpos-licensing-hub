@@ -1,6 +1,6 @@
 /** Extra days added to a subscription license beyond its billing cycle, so a
  *  customer who is offline at renewal time keeps working through the gap. */
-export const SUBSCRIPTION_BUFFER_DAYS = 7
+export const SUBSCRIPTION_BUFFER_DAYS = 5
 
 /** Default machines per license when the license row does not say. */
 export const DEFAULT_ACTIVATION_LIMIT = 1

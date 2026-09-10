@@ -47,7 +47,11 @@ export function resolveEntitlement(license: LicenseState, now: Date = new Date()
     // Subscription licenses always carry an expiry; signed at renewal.
     if (!license.expiresAt) return { allowed: false, reason: 'Subscription has no active period', billing: true }
     const expiry = new Date(license.expiresAt).getTime()
-    if (Number.isFinite(expiry) && expiry + SUBSCRIPTION_BUFFER_DAYS * DAY_MS < now.getTime()) {
+    // An active subscription may be reactivated after a payment gap. Let
+    // /renew advance it from the stored last expiry (or from now if that date
+    // is already past); do not reject it here as "lapsed" before renewal can
+    // repair the entitlement.
+    if (subStatus !== 'active' && Number.isFinite(expiry) && expiry + SUBSCRIPTION_BUFFER_DAYS * DAY_MS < now.getTime()) {
       return { allowed: false, reason: 'Subscription period lapsed', billing: true }
     }
   }
@@ -195,8 +199,10 @@ export function nextRenewalExpiry(input: {
     return { renew: false, expiresAt: input.expiresAt }
   }
 
-  const current = new Date(input.expiresAt)
-  const base = current.getTime() > now.getTime() ? current : now
+  // Always anchor at the stored subscription end. This is what makes a
+  // reactivation resume the subscription timeline instead of silently starting
+  // a new period from the date the license happened to be activated.
+  const base = new Date(input.expiresAt)
   const extended = addMonths(input.billingCycleMonths, base)
   extended.setDate(extended.getDate() + input.bufferDays)
   return { renew: true, expiresAt: extended.toISOString() }
