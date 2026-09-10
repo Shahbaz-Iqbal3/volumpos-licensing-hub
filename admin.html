@@ -75,7 +75,7 @@
       </section>
     </section>
   </main>
-  <div id="modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 items-center justify-center"><div class="panel rounded-2xl p-6 w-full max-w-xl shadow-2xl"><div class="flex justify-between items-center mb-5"><h2 id="modalTitle" class="text-lg font-semibold text-white"></h2><button id="closeModal" class="text-slate-400 hover:text-white text-2xl">&times;</button></div><form id="modalForm" class="space-y-4"></form></div></div>
+  <div id="modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 items-center justify-center overflow-y-auto"><div class="panel rounded-2xl p-6 w-full max-w-xl max-h-[calc(100vh-2rem)] flex flex-col shadow-2xl"><div class="flex justify-between items-center mb-5 shrink-0"><h2 id="modalTitle" class="text-lg font-semibold text-white"></h2><button id="closeModal" class="text-slate-400 hover:text-white text-2xl">&times;</button></div><form id="modalForm" class="space-y-4 overflow-y-auto pr-1"></form></div></div>
   <script src="admin.js"></script>
 </body>
 </html>
