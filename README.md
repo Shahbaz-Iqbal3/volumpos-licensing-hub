@@ -140,6 +140,27 @@ typed by the operator and kept in `sessionStorage` — it is never written to
 
 Then create a customer, issue a license, and copy the one-time key.
 
+### Vercel deployment
+
+The panel is deployed at:
+
+`https://volumpos-licensing-hub.vercel.app`
+
+The Vercel project uses `vercel.json` to run `npm run config` during the build,
+with the production `HUB_URL` environment variable set in Vercel. The root URL
+rewrites to `/admin`; `/config.js` contains only the public hub URL. The admin
+secret is not a Vercel environment variable and must be entered in the panel.
+
+Deploy/update it with:
+
+```bash
+vercel deploy --prod --yes
+```
+
+The Vercel project must keep the `HUB_URL` environment variable configured for
+Production. Do not add `LICENSE_ADMIN_SECRET` to Vercel or to the deployed
+static files.
+
 > ⚠️ **Never put the admin secret in `.env` or `config.js`.** Everything the
 > panel serves is public. `.env` holds the URL only.
 
