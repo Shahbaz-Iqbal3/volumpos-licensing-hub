@@ -88,7 +88,7 @@ serve(async (req) => {
         license_id: licenseId, machine_fingerprint: fingerprint, action: 'activate',
         result: 'denied', reason: entitlement.reason, ip
       })
-      return json({ error: entitlement.reason }, 403)
+      return json({ error: entitlement.reason, billing: entitlement.billing }, 403)
     }
 
     // Existing activations, to decide seat vs re-issue.

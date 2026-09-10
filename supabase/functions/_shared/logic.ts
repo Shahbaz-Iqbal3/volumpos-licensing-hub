@@ -15,7 +15,7 @@ export type LicenseState = {
 
 export type Entitlement =
   | { allowed: true; expiresAt: string }
-  | { allowed: false; reason: string }
+  | { allowed: false; reason: string; billing: boolean }
 
 const DAY_MS = 86_400_000
 
@@ -30,22 +30,25 @@ const DAY_MS = 86_400_000
  *   expires (a true one-time grant).
  */
 export function resolveEntitlement(license: LicenseState, now: Date = new Date()): Entitlement {
-  if (license.status === 'revoked') return { allowed: false, reason: 'License revoked' }
-  if (license.status === 'suspended') return { allowed: false, reason: 'License suspended' }
+  // `billing: true` tells a client to show a billing/contact-support prompt.
+  // Admin actions (revoked/suspended) are not billing problems, so they set it
+  // false — otherwise the app would tell the customer to fix their payment.
+  if (license.status === 'revoked') return { allowed: false, reason: 'License revoked', billing: false }
+  if (license.status === 'suspended') return { allowed: false, reason: 'License suspended', billing: false }
 
   if (license.licenseType === 'subscription') {
     const subStatus = license.subscriptionStatus
-    if (subStatus === 'cancelled') return { allowed: false, reason: 'Subscription cancelled' }
-    if (subStatus === 'past_due') return { allowed: false, reason: 'Subscription payment past due' }
-    if (subStatus === 'paused') return { allowed: false, reason: 'Subscription paused' }
+    if (subStatus === 'cancelled') return { allowed: false, reason: 'Subscription cancelled', billing: true }
+    if (subStatus === 'past_due') return { allowed: false, reason: 'Subscription payment past due', billing: true }
+    if (subStatus === 'paused') return { allowed: false, reason: 'Subscription paused', billing: true }
     if (subStatus && subStatus !== 'active') {
-      return { allowed: false, reason: `Subscription ${subStatus}` }
+      return { allowed: false, reason: `Subscription ${subStatus}`, billing: true }
     }
     // Subscription licenses always carry an expiry; signed at renewal.
-    if (!license.expiresAt) return { allowed: false, reason: 'Subscription has no active period' }
+    if (!license.expiresAt) return { allowed: false, reason: 'Subscription has no active period', billing: true }
     const expiry = new Date(license.expiresAt).getTime()
     if (Number.isFinite(expiry) && expiry + SUBSCRIPTION_BUFFER_DAYS * DAY_MS < now.getTime()) {
-      return { allowed: false, reason: 'Subscription period lapsed' }
+      return { allowed: false, reason: 'Subscription period lapsed', billing: true }
     }
   }
 
@@ -148,4 +151,53 @@ export function withinRenewalWindow(expiresAt: string, windowDays = 5, now: Date
   const windowStart = new Date(expiry)
   windowStart.setDate(windowStart.getDate() - windowDays)
   return now >= windowStart
+}
+
+export function addMonths(months: number, from: Date = new Date()): Date {
+  const date = new Date(from.getTime())
+  date.setMonth(date.getMonth() + months)
+  return date
+}
+
+export function addDays(days: number, from: Date = new Date()): Date {
+  const date = new Date(from.getTime())
+  date.setDate(date.getDate() + days)
+  return date
+}
+
+export type RenewalDecision =
+  | { renew: false; expiresAt: string }
+  | { renew: true; expiresAt: string }
+
+/**
+ * Decide the expiry a `/renew` call should sign.
+ *
+ * Outside the renewal window nothing changes — the same expiry is returned, so
+ * a retrying client (restart, flaky network) cannot stack extra billing cycles.
+ * Inside the window a subscription is extended by one cycle plus the offline
+ * buffer, which lands a full cycle out and so is idempotent on the next call.
+ */
+export function nextRenewalExpiry(input: {
+  expiresAt: string
+  licenseType: 'perpetual' | 'subscription'
+  billingCycleMonths?: number | null
+  bufferDays: number
+  windowDays?: number
+  now?: Date
+}): RenewalDecision {
+  const now = input.now ?? new Date()
+  if (!withinRenewalWindow(input.expiresAt, input.windowDays ?? 5, now)) {
+    return { renew: false, expiresAt: input.expiresAt }
+  }
+
+  if (input.licenseType !== 'subscription' || !input.billingCycleMonths) {
+    // Perpetual licenses are not extended; re-sign the same expiry.
+    return { renew: false, expiresAt: input.expiresAt }
+  }
+
+  const current = new Date(input.expiresAt)
+  const base = current.getTime() > now.getTime() ? current : now
+  const extended = addMonths(input.billingCycleMonths, base)
+  extended.setDate(extended.getDate() + input.bufferDays)
+  return { renew: true, expiresAt: extended.toISOString() }
 }

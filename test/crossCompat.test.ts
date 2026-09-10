@@ -17,7 +17,8 @@ import {
   decideActivation,
   resolveEntitlement,
   sourcesMatch,
-  withinRenewalWindow
+  withinRenewalWindow,
+  nextRenewalExpiry
 } from '../supabase/functions/_shared/logic.ts'
 import { generateLicenseKey, hashLicenseKey, keyLast4, normalizeKey, productTag } from '../supabase/functions/_shared/keys.ts'
 
@@ -201,17 +202,19 @@ describe('activation decisions', () => {
 describe('entitlement', () => {
   const now = new Date('2026-06-01T00:00:00Z')
 
-  it('denies revoked and suspended licenses', () => {
+  it('denies revoked and suspended licenses as non-billing', () => {
     for (const status of ['revoked', 'suspended']) {
       const result = resolveEntitlement({
         id: 'L', product: 'RESTAURANT_POS', licenseType: 'perpetual',
         status, activationLimit: 1, expiresAt: null, durationMonths: null
       }, now)
       expect(result.allowed).toBe(false)
+      // Admin actions must not surface as a billing problem to the customer.
+      if (!result.allowed) expect(result.billing).toBe(false)
     }
   })
 
-  it('denies subscriptions that are not active', () => {
+  it('denies subscriptions that are not active as billing', () => {
     for (const subscriptionStatus of ['cancelled', 'past_due', 'paused']) {
       const result = resolveEntitlement({
         id: 'L', product: 'RESTAURANT_POS', licenseType: 'subscription',
@@ -219,6 +222,7 @@ describe('entitlement', () => {
         expiresAt: '2026-06-10T00:00:00Z', durationMonths: 1, subscriptionStatus
       }, now)
       expect(result.allowed).toBe(false)
+      if (!result.allowed) expect(result.billing).toBe(true)
     }
   })
 
@@ -242,6 +246,63 @@ describe('entitlement', () => {
   it('flags renewal only inside the window', () => {
     expect(withinRenewalWindow('2026-06-03T00:00:00Z', 5, now)).toBe(true)
     expect(withinRenewalWindow('2026-08-01T00:00:00Z', 5, now)).toBe(false)
+  })
+
+  it('does not extend a subscription outside the renewal window', () => {
+    // Regression: repeated /renew calls used to stack a billing cycle each time.
+    const decision = nextRenewalExpiry({
+      expiresAt: '2026-10-01T00:00:00Z',
+      licenseType: 'subscription',
+      billingCycleMonths: 1,
+      bufferDays: 7,
+      now
+    })
+    expect(decision.renew).toBe(false)
+    expect(decision.expiresAt).toBe('2026-10-01T00:00:00Z')
+  })
+
+  it('extends a subscription one cycle plus buffer inside the window', () => {
+    const decision = nextRenewalExpiry({
+      expiresAt: '2026-06-03T00:00:00Z',
+      licenseType: 'subscription',
+      billingCycleMonths: 1,
+      bufferDays: 7,
+      now
+    })
+    expect(decision.renew).toBe(true)
+    // 2026-06-03 + 1 month = 2026-07-03, + 7 days = 2026-07-10.
+    expect(decision.expiresAt.slice(0, 10)).toBe('2026-07-10')
+  })
+
+  it('is idempotent on immediate retry after renewing', () => {
+    const first = nextRenewalExpiry({
+      expiresAt: '2026-06-03T00:00:00Z',
+      licenseType: 'subscription',
+      billingCycleMonths: 1,
+      bufferDays: 7,
+      now
+    })
+    expect(first.renew).toBe(true)
+    const second = nextRenewalExpiry({
+      expiresAt: first.expiresAt,
+      licenseType: 'subscription',
+      billingCycleMonths: 1,
+      bufferDays: 7,
+      now
+    })
+    expect(second.renew).toBe(false)
+    expect(second.expiresAt).toBe(first.expiresAt)
+  })
+
+  it('never extends a perpetual license', () => {
+    const decision = nextRenewalExpiry({
+      expiresAt: '2026-06-03T00:00:00Z',
+      licenseType: 'perpetual',
+      billingCycleMonths: undefined,
+      bufferDays: 7,
+      now
+    })
+    expect(decision.renew).toBe(false)
   })
 
   it('adds calendar months', () => {

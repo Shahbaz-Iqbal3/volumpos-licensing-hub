@@ -11,8 +11,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { json, preflight, methodNotAllowed, clientIp } from '../_shared/http.ts'
 import { serviceClient, signingKey, logCheckin, type LicenseRow } from '../_shared/db.ts'
-import { sanitizeSources, signLicensePayload, addMonths } from '../_shared/licenseSign.ts'
-import { resolveEntitlement, withinRenewalWindow } from '../_shared/logic.ts'
+import { sanitizeSources, signLicensePayload } from '../_shared/licenseSign.ts'
+import { resolveEntitlement, nextRenewalExpiry } from '../_shared/logic.ts'
 import { SUBSCRIPTION_BUFFER_DAYS } from '../_shared/constants.ts'
 
 serve(async (req) => {
@@ -83,24 +83,24 @@ serve(async (req) => {
 
     if (!entitlement.allowed) {
       await logCheckin(db, { license_id: licenseId, machine_fingerprint: fingerprint, action: 'renew', result: 'denied', reason: entitlement.reason, ip })
-      // 200 with a billing flag: this is an expected state, not a transport error.
-      return json({ ok: false, billing: true, error: entitlement.reason })
+      // 200 with a flag: an expected state, not a transport error. `billing`
+      // distinguishes "fix your payment" from "contact support / admin action".
+      return json({ ok: false, billing: entitlement.billing, error: entitlement.reason })
     }
 
-    // Compute the signed expiry. For a subscription, extend past the current
-    // period by the billing cycle plus a buffer so an offline gap is covered.
-    let expiresAt = entitlement.expiresAt
-    if (license.license_type === 'subscription' && subscription) {
-      const base = license.expires_at && new Date(license.expires_at) > new Date()
-        ? new Date(license.expires_at)
-        : new Date()
-      const extended = addMonths(subscription.billing_cycle_months, base)
-      extended.setDate(extended.getDate() + SUBSCRIPTION_BUFFER_DAYS)
-      expiresAt = extended.toISOString()
-    } else if (!withinRenewalWindow(entitlement.expiresAt)) {
-      // Perpetual license, not near expiry: nothing to do.
-      return json({ ok: true, renewed: false, expires_at: entitlement.expiresAt })
+    // Compute the expiry to sign. Outside the renewal window nothing changes
+    // (idempotent retries); inside it a subscription advances one billing cycle
+    // plus the offline buffer. Perpetual licenses are never extended.
+    const decision = nextRenewalExpiry({
+      expiresAt: entitlement.expiresAt,
+      licenseType: license.license_type,
+      billingCycleMonths: subscription?.billing_cycle_months ?? license.duration_months,
+      bufferDays: SUBSCRIPTION_BUFFER_DAYS
+    })
+    if (!decision.renew) {
+      return json({ ok: true, renewed: false, expires_at: decision.expiresAt })
     }
+    const expiresAt = decision.expiresAt
 
     const now = new Date().toISOString()
     const signed = await signLicensePayload(

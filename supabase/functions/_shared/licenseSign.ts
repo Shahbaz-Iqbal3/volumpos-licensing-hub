@@ -131,15 +131,4 @@ export function sanitizeSources(value: unknown): FingerprintSources | undefined 
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-/** Add whole months to `from`, calendar-aware. */
-export function addMonths(months: number, from: Date = new Date()): Date {
-  const date = new Date(from.getTime())
-  date.setMonth(date.getMonth() + months)
-  return date
-}
-
-export function addDays(days: number, from: Date = new Date()): Date {
-  const date = new Date(from.getTime())
-  date.setDate(date.getDate() + days)
-  return date
-}
+export { addMonths, addDays } from './logic.ts'
