@@ -92,6 +92,98 @@ serve(async (req) => {
         return respond({ ok: true, customers: data ?? [] })
       }
 
+      case 'issue-license-bundle': {
+        const customerName = typeof body.customer_name === 'string' ? body.customer_name.trim() : ''
+        const product = typeof body.product === 'string' ? body.product : ''
+        const licenseType = body.license_type === 'subscription' ? 'subscription' : 'perpetual'
+        if (!customerName || !product) return respond({ error: 'customer_name and product are required' }, 400)
+        if (!isKnownProduct(product)) return respond({ error: `Unknown product ${product}` }, 400)
+
+        const activationLimit = Math.max(1, Math.floor(Number(body.activation_limit) || DEFAULT_ACTIVATION_LIMIT))
+        const features = Array.isArray(body.features) ? body.features.filter((f: unknown) => typeof f === 'string') : []
+        const tier = typeof body.tier === 'string' && body.tier ? body.tier : null
+        const durationMonths = Number.isFinite(Number(body.duration_months)) && Number(body.duration_months) > 0
+          ? Math.floor(Number(body.duration_months))
+          : null
+        const billingCycleMonths = licenseType === 'subscription'
+          ? Math.max(1, Math.floor(Number(body.billing_cycle_months) || durationMonths || 1))
+          : null
+
+        let customerId: string | null = null
+        let subscriptionId: string | null = null
+        try {
+          customerId = await nextId(db, 'CUST-', 'customer', 4)
+          const customerInsert = await db.from('customers').insert({
+            id: customerId,
+            name: customerName,
+            phone: typeof body.phone === 'string' ? body.phone.trim() || null : null,
+            email: typeof body.email === 'string' ? body.email.trim() || null : null,
+            notes: typeof body.notes === 'string' ? body.notes.trim() || null : null
+          })
+          if (customerInsert.error) throw new Error(customerInsert.error.message)
+
+          if (licenseType === 'subscription') {
+            const subscription = await db.from('subscriptions').insert({
+              customer_id: customerId,
+              product,
+              status: 'active',
+              billing_cycle_months: billingCycleMonths,
+              price_minor: Number.isFinite(Number(body.price_minor)) ? Math.floor(Number(body.price_minor)) : null,
+              currency: typeof body.currency === 'string' ? body.currency : 'PKR',
+              next_billing_date: typeof body.next_billing_date === 'string' ? body.next_billing_date : null
+            }).select('id').maybeSingle()
+            if (subscription.error || !subscription.data?.id) throw new Error(subscription.error?.message || 'subscription creation failed')
+            subscriptionId = subscription.data.id
+          }
+
+          let expiresAt: string | null = null
+          if (licenseType === 'subscription') {
+            expiresAt = addMonths(billingCycleMonths || 1).toISOString()
+          } else if (tier && TIER_DAYS[tier] !== undefined) {
+            const date = new Date()
+            date.setDate(date.getDate() + TIER_DAYS[tier]!)
+            expiresAt = date.toISOString()
+          }
+
+          const licenseId = await nextId(db, 'LIC-', 'license', 7)
+          const rawKey = generateLicenseKey(productTag(product))
+          const keyHash = await hashLicenseKey(rawKey)
+          const licenseInsert = await db.from('licenses').insert({
+            id: licenseId,
+            customer_id: customerId,
+            product,
+            license_type: licenseType,
+            tier,
+            duration_months: durationMonths || billingCycleMonths,
+            features,
+            activation_limit: activationLimit,
+            status: 'unactivated',
+            key_hash: keyHash,
+            key_last4: keyLast4(rawKey),
+            expires_at: expiresAt,
+            subscription_id: subscriptionId
+          })
+          if (licenseInsert.error) throw new Error(licenseInsert.error.message)
+
+          await logCheckin(db, { action: 'admin', result: 'ok', reason: `issue-license-bundle ${licenseId}`, ip })
+          return respond({
+            ok: true,
+            customer_id: customerId,
+            subscription_id: subscriptionId,
+            license_id: licenseId,
+            license_key: rawKey,
+            expires_at: expiresAt,
+            note: 'This key is shown once. Store it safely and give it to the customer.'
+          })
+        } catch (error) {
+          // Best-effort rollback keeps a failed one-click issue from leaving
+          // orphan customer/subscription rows behind.
+          if (subscriptionId) await db.from('subscriptions').delete().eq('id', subscriptionId)
+          if (customerId) await db.from('customers').delete().eq('id', customerId)
+          return respond({ error: String((error as Error)?.message || error) }, 500)
+        }
+      }
+
       case 'update-customer': {
         const customerId = typeof body.customer_id === 'string' ? body.customer_id : ''
         if (!customerId) return respond({ error: 'customer_id is required' }, 400)

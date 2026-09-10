@@ -24,8 +24,6 @@
           <h1 class="text-2xl font-semibold text-white">Licensing Hub</h1>
           <p class="text-sm text-slate-400 mt-2">Secure operator sign-in</p>
         </div>
-        <label class="block text-xs text-slate-400 mb-2">Hub URL</label>
-        <input id="loginUrl" class="w-full rounded-lg px-3 py-2.5 text-sm mb-4" autocomplete="url">
         <label class="block text-xs text-slate-400 mb-2">Admin secret</label>
         <input id="loginSecret" type="password" class="w-full rounded-lg px-3 py-2.5 text-sm" autocomplete="current-password" autofocus>
         <button id="loginButton" class="mt-5 w-full rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold py-2.5">Sign in</button>
@@ -57,50 +55,27 @@
 
       <section id="customersTab" class="tab-page">
         <div class="panel rounded-xl p-4 mb-4">
-          <h2 class="font-semibold mb-3">Create customer</h2>
-          <form id="customerForm" class="grid md:grid-cols-4 gap-3">
-            <input id="customerName" required class="rounded-lg px-3 py-2 text-sm" placeholder="Business name">
-            <input id="customerPhone" class="rounded-lg px-3 py-2 text-sm" placeholder="Phone">
-            <input id="customerEmail" type="email" class="rounded-lg px-3 py-2 text-sm" placeholder="Email">
-            <button class="rounded-lg bg-teal-500 text-slate-950 font-semibold text-sm">Create customer</button>
-          </form>
+          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Customers</h2><p class="text-xs text-slate-400 mt-1">Customers are created automatically when issuing a license.</p></div><button id="newCustomer" class="rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 text-sm">New customer</button></div>
         </div>
         <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Phone</th><th class="p-3">Email</th><th class="p-3">Actions</th></tr></thead><tbody id="customers"></tbody></table></div>
       </section>
 
       <section id="licensesTab" class="tab-page hidden">
         <div class="panel rounded-xl p-4 mb-4">
-          <h2 class="font-semibold mb-3">Issue license</h2>
-          <form id="licenseForm" class="grid md:grid-cols-4 gap-3">
-            <input id="licenseCustomer" required class="rounded-lg px-3 py-2 text-sm" placeholder="Customer ID">
-            <select id="licenseProduct" class="rounded-lg px-3 py-2 text-sm"><option>RESTAURANT_POS</option><option>FABRIC_POS</option></select>
-            <select id="licenseType" class="rounded-lg px-3 py-2 text-sm"><option value="perpetual">Perpetual</option><option value="subscription">Subscription</option></select>
-            <input id="licenseTier" class="rounded-lg px-3 py-2 text-sm" placeholder="Tier: 1y / 2y / 5y">
-            <input id="licenseMonths" type="number" min="1" class="rounded-lg px-3 py-2 text-sm" placeholder="Subscription months">
-            <input id="licenseSubscription" class="rounded-lg px-3 py-2 text-sm" placeholder="Subscription UUID (optional)">
-            <input id="licenseLimit" type="number" min="1" value="1" class="rounded-lg px-3 py-2 text-sm" placeholder="Machine limit">
-            <button class="rounded-lg bg-teal-500 text-slate-950 font-semibold text-sm">Issue license</button>
-          </form>
-          <div id="issuedKey" class="hidden mt-4 rounded-lg bg-slate-950 border border-teal-900 p-3"><div class="text-xs text-slate-400">Purchase key. Copy it now; it is shown once.</div><code id="issuedKeyValue" class="block text-teal-300 mt-2 select-all"></code></div>
+          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Licenses</h2><p class="text-xs text-slate-400 mt-1">Issue a customer, subscription, and license in one step.</p></div><button id="newLicense" class="rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold px-4 py-2 text-sm">Issue license</button></div>
         </div>
         <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Customer</th><th class="p-3">Product</th><th class="p-3">Type</th><th class="p-3">Status</th><th class="p-3">Expires</th><th class="p-3">Limit</th><th class="p-3">Actions</th></tr></thead><tbody id="licenses"></tbody></table></div>
       </section>
 
       <section id="subscriptionsTab" class="tab-page hidden">
         <div class="panel rounded-xl p-4 mb-4">
-          <h2 class="font-semibold mb-3">Create subscription</h2>
-          <form id="subscriptionForm" class="grid md:grid-cols-5 gap-3">
-            <input id="subscriptionCustomer" required class="rounded-lg px-3 py-2 text-sm" placeholder="Customer ID">
-            <select id="subscriptionProduct" class="rounded-lg px-3 py-2 text-sm"><option>RESTAURANT_POS</option><option>FABRIC_POS</option></select>
-            <input id="subscriptionMonths" required type="number" min="1" value="1" class="rounded-lg px-3 py-2 text-sm" placeholder="Cycle months">
-            <input id="subscriptionPrice" type="number" min="0" class="rounded-lg px-3 py-2 text-sm" placeholder="Price (minor PKR)">
-            <button class="rounded-lg bg-teal-500 text-slate-950 font-semibold text-sm">Create subscription</button>
-          </form>
+          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Subscriptions</h2><p class="text-xs text-slate-400 mt-1">Control billing status, cycle, and next billing date from one table.</p></div><button id="newSubscription" class="rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 text-sm">New subscription</button></div>
         </div>
         <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Customer</th><th class="p-3">Product</th><th class="p-3">Status</th><th class="p-3">Cycle</th><th class="p-3">Next billing</th><th class="p-3">Actions</th></tr></thead><tbody id="subscriptions"></tbody></table></div>
       </section>
     </section>
   </main>
+  <div id="modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 items-center justify-center"><div class="panel rounded-2xl p-6 w-full max-w-xl shadow-2xl"><div class="flex justify-between items-center mb-5"><h2 id="modalTitle" class="text-lg font-semibold text-white"></h2><button id="closeModal" class="text-slate-400 hover:text-white text-2xl">&times;</button></div><form id="modalForm" class="space-y-4"></form></div></div>
   <script src="admin.js"></script>
 </body>
 </html>
