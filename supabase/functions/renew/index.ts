@@ -60,11 +60,11 @@ serve(async (req) => {
       return json({ error: 'This machine is not activated for the license' }, 403)
     }
 
-    let subscription: { status: string; billing_cycle_months: number } | null = null
+    let subscription: { status: string; billing_cycle_months: number; auto_renew?: boolean; auto_renew_until?: string | null } | null = null
     if (license.subscription_id) {
       const { data } = await db
         .from('subscriptions')
-        .select('status, billing_cycle_months')
+        .select('status, billing_cycle_months, auto_renew, auto_renew_until')
         .eq('id', license.subscription_id)
         .maybeSingle()
       subscription = data ?? null
@@ -86,6 +86,15 @@ serve(async (req) => {
       // 200 with a flag: an expected state, not a transport error. `billing`
       // distinguishes "fix your payment" from "contact support / admin action".
       return json({ ok: false, billing: entitlement.billing, error: entitlement.reason })
+    }
+
+    if (subscription && subscription.auto_renew === false) {
+      await logCheckin(db, { license_id: license.id, machine_fingerprint: fingerprint, action: 'renew', result: 'denied', reason: 'Auto-renew disabled', ip })
+      return json({ ok: false, billing: true, error: 'Auto-renew is disabled for this subscription' }, 200, req)
+    }
+    if (subscription?.auto_renew_until && new Date(subscription.auto_renew_until).getTime() < Date.now()) {
+      await logCheckin(db, { license_id: license.id, machine_fingerprint: fingerprint, action: 'renew', result: 'denied', reason: 'Auto-renew term ended', ip })
+      return json({ ok: false, billing: true, error: 'Auto-renew term has ended' }, 200, req)
     }
 
     // Compute the expiry to sign. Outside the renewal window nothing changes

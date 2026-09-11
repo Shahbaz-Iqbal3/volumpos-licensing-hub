@@ -4,78 +4,244 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>VolumPOS Licensing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="config.js" onerror="void 0"></script>
   <style>
-    :root { color-scheme: dark; }
-    body { background: #08111f; }
-    .panel { background: rgba(15, 29, 49, .86); border: 1px solid #203452; }
-    input, select, textarea { background: #0a1729 !important; border-color: #29405f !important; }
-    input:focus, select:focus, textarea:focus { border-color: #36d1b4 !important; outline: none; box-shadow: 0 0 0 2px rgba(54,209,180,.15); }
-    .tab.active { color: #5eead4; border-bottom-color: #2dd4bf; }
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{background:radial-gradient(circle at 15% 0%,#16283b 0,#080d18 38%);letter-spacing:-.01em;overflow-x:hidden;font-family:'IBM Plex Mono', ui-monospace, monospace}
+    h1,h2,h3{font-family:'Fraunces', ui-serif, Georgia, serif; letter-spacing:-.01em}
+
+    .panel{background:rgba(17,25,39,.78);border:1px solid rgba(148,163,184,.14);box-shadow:0 20px 60px rgba(0,0,0,.18);backdrop-filter:blur(18px)}
+
+    input,select,textarea{background:rgba(8,15,28,.72)!important;border-color:rgba(148,163,184,.18)!important;min-height:44px;font-family:'IBM Plex Mono', ui-monospace, monospace}
+    input:focus,select:focus,textarea:focus{border-color:#2dd4bf!important;outline:none;box-shadow:0 0 0 4px rgba(45,212,191,.10)}
+
+    .tab{border-bottom:2px solid transparent;font-family:'IBM Plex Mono', monospace}
+    .tab.active{color:#5eead4;border-bottom-color:#2dd4bf;font-weight:600}
+
+    .choice{border:1px solid rgba(148,163,184,.18)}
+    .choice.active{border-color:#2dd4bf;background:rgba(45,212,191,.08);color:#ccfbf1}
+    .choice .dot{width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(148,163,184,.4);display:inline-block;position:relative;margin-right:.4rem;vertical-align:-2px}
+    .choice.active .dot{border-color:#2dd4bf}
+    .choice.active .dot:after{content:'';position:absolute;inset:2.5px;border-radius:50%;background:#2dd4bf}
+
+    .shimmer{background:linear-gradient(90deg,rgba(148,163,184,.08) 25%,rgba(148,163,184,.18) 50%,rgba(148,163,184,.08) 75%);background-size:200% 100%;animation:shimmer 1.6s infinite}
+    .success-pop{animation:success-pop .35s ease-out}
+    .copy-pop{animation:copy-pop .25s ease-out}
+    @keyframes shimmer{to{background-position:-200% 0}}
+    @keyframes success-pop{0%{opacity:0;transform:translateY(8px) scale(.99)}100%{opacity:1;transform:translateY(0) scale(1)}}
+    @keyframes copy-pop{0%{transform:scale(.96)}100%{transform:scale(1)}}
+    @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
+
+    .seal{
+      width:60px;height:60px;border-radius:50%;
+      border:1.5px solid #2dd4bf;
+      display:grid;place-items:center;
+      font-family:'Fraunces', serif;font-weight:600;font-size:.78rem;color:#5eead4;
+      letter-spacing:.02em;
+      transform:rotate(-6deg);
+      position:relative;
+    }
+    .seal:before{content:'';position:absolute;inset:5px;border:1px dashed #2dd4bf;border-radius:50%;opacity:.55}
+
+    .receipt{position:relative}
+    .receipt:before{
+      content:'';position:absolute;left:0;right:0;top:-1px;height:1px;
+      background-image:repeating-linear-gradient(90deg,rgba(148,163,184,.4) 0 6px, transparent 6px 12px);
+    }
+
+    @media (max-width:640px){
+      main{padding-left:1rem!important;padding-right:1rem!important;padding-top:1.25rem!important}
+      #dashboard>header{align-items:flex-start;flex-direction:column;gap:1rem;margin-bottom:1.5rem}
+      #dashboard>header>div:last-child{width:100%}
+      #dashboard>header button{flex:1;min-height:42px}
+      .tab{white-space:nowrap;min-height:44px}
+      .tab-page{min-width:0}
+      .tab-page>div{max-width:none}
+      .choice{min-height:44px;padding-left:.4rem!important;padding-right:.4rem!important}
+      .panel{box-shadow:0 12px 35px rgba(0,0,0,.16)}
+      #issueForm{padding:1rem!important;border-radius:1rem;display:grid;grid-template-columns:1fr;gap:.85rem}
+      #issueForm [class*="sm:col-span-2"]{grid-column:span 1}
+      .grid.sm\:grid-cols-2{grid-template-columns:1fr}
+      .overflow-x-auto{overflow:visible}
+      .overflow-x-auto table,.overflow-x-auto thead,.overflow-x-auto tbody,.overflow-x-auto tr,.overflow-x-auto td{display:block;width:100%}
+      .overflow-x-auto thead{display:none}
+      .overflow-x-auto tr{margin-bottom:.75rem;padding:.65rem .8rem;border:1px solid rgba(148,163,184,.12);border-radius:.85rem;background:rgba(17,25,39,.62)}
+      .overflow-x-auto td{display:flex;justify-content:space-between;gap:1rem;padding:.45rem 0!important;border:0!important;text-align:right}
+      .overflow-x-auto td:before{content:attr(data-label);color:#94a3b8;font-size:.7rem;letter-spacing:.08em;text-align:left}
+      .overflow-x-auto td[colspan]{display:block;text-align:left}
+      .overflow-x-auto td[colspan]:before{display:none}
+      #customers td:nth-child(2){display:block;text-align:left}
+      #customers td:nth-child(2):before{display:none}
+      #customers .mt-3{margin-top:.75rem}
+      .modal-card{max-height:calc(100vh - 2rem)!important;padding:1rem!important}
+      .text-2xl{font-size:1.45rem;line-height:1.2}
+    }
   </style>
 </head>
 <body class="min-h-screen text-slate-200">
-  <main class="max-w-7xl mx-auto p-4 sm:p-8">
+  <main class="max-w-6xl mx-auto px-4 py-6 sm:px-8 sm:py-10">
+
     <section id="login" class="min-h-[80vh] flex items-center justify-center">
-      <div class="panel rounded-2xl p-7 w-full max-w-md shadow-2xl shadow-cyan-950/20">
-        <div class="mb-8">
-          <div class="text-xs uppercase tracking-[.25em] text-teal-400 mb-3">VolumPOS</div>
-          <h1 class="text-2xl font-semibold text-white">Licensing Hub</h1>
-          <p class="text-sm text-slate-400 mt-2">Secure operator sign-in</p>
-        </div>
+      <div class="panel rounded-2xl p-7 w-full max-w-sm">
+        <div class="seal mb-5">P2S</div>
+        <h1 class="text-2xl font-semibold text-white">Licensing ledger</h1>
+        <p class="text-sm text-slate-400 mt-2 mb-7">Sign in to issue and manage VolumPOS entitlements.</p>
         <label class="block text-xs text-slate-400 mb-2">Admin secret</label>
         <input id="loginSecret" type="password" class="w-full rounded-lg px-3 py-2.5 text-sm" autocomplete="current-password" autofocus>
-        <button id="loginButton" class="mt-5 w-full rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold py-2.5">Sign in</button>
+        <button id="loginButton" class="mt-4 w-full rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold py-2.5">Sign in</button>
         <p id="loginError" class="hidden text-sm text-red-300 mt-3"></p>
-        <p class="text-[11px] text-slate-500 mt-6">The secret is kept in this browser tab only. It is never part of the deployed files.</p>
       </div>
     </section>
 
     <section id="dashboard" class="hidden">
-      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-7">
+      <header class="flex items-center justify-between mb-8 pb-6 border-b border-slate-800">
         <div>
-          <div class="text-xs uppercase tracking-[.25em] text-teal-400 mb-2">VolumPOS</div>
-          <h1 class="text-3xl font-semibold text-white">Licensing Hub</h1>
-          <p class="text-sm text-slate-400 mt-1">Customers, entitlements, and subscription control</p>
+          <div class="text-xs text-slate-400 mb-1">P2S Registry</div>
+          <h1 class="text-2xl font-semibold text-white">Licensing ledger</h1>
+          <p class="text-sm text-slate-400 mt-1">VolumPOS, Restaurant POS, and Fabric POS entitlements.</p>
         </div>
         <div class="flex gap-2">
-          <button id="refresh" class="px-3 py-2 rounded-lg panel text-sm hover:border-teal-400">Refresh</button>
-          <button id="signOut" class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:bg-slate-800">Sign out</button>
+          <button id="refresh" class="px-3 py-2 rounded-lg panel text-sm">Refresh</button>
+          <button id="signOut" class="px-3 py-2 rounded-lg border border-slate-700 text-sm">Sign out</button>
         </div>
       </header>
-      <div id="error" class="hidden rounded-lg border border-red-900 bg-red-950/40 p-3 mb-5 text-sm text-red-200"></div>
-      <div id="stats" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8"></div>
 
-      <nav class="flex gap-5 border-b border-slate-800 mb-6">
-        <button class="tab active pb-3 border-b-2 border-transparent text-sm" data-tab="customers">Customers</button>
-        <button class="tab pb-3 border-b-2 border-transparent text-sm text-slate-400" data-tab="licenses">Licenses</button>
-        <button class="tab pb-3 border-b-2 border-transparent text-sm text-slate-400" data-tab="subscriptions">Subscriptions</button>
+      <div id="error" class="hidden rounded-lg border border-red-900 bg-red-950/40 p-3 mb-5 text-sm text-red-200"></div>
+
+      <div id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8"></div>
+
+      <nav class="flex gap-1 border-b border-slate-800 mb-6 overflow-x-auto">
+        <button class="tab active px-4 pb-3 pt-1 text-sm" data-tab="issue">Issue</button>
+        <button class="tab px-4 pb-3 pt-1 text-sm text-slate-400" data-tab="subscriptions">Subscriptions</button>
+        <button class="tab px-4 pb-3 pt-1 text-sm text-slate-400" data-tab="customers">Customers</button>
       </nav>
 
-      <section id="customersTab" class="tab-page">
-        <div class="panel rounded-xl p-4 mb-4">
-          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Customers</h2><p class="text-xs text-slate-400 mt-1">Customers are created automatically when issuing a license.</p></div><button id="newCustomer" class="rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 text-sm">New customer</button></div>
-        </div>
-        <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Phone</th><th class="p-3">Email</th><th class="p-3">Actions</th></tr></thead><tbody id="customers"></tbody></table></div>
-      </section>
+      <section id="issueTab" class="tab-page">
+        <div class="max-w-2xl">
+          <div class="mb-5">
+            <div class="pl-3 border-l-2 border-teal-400 text-sm text-teal-300 mb-3">New entitlement</div>
+            <h2 class="text-2xl font-semibold text-white">Issue subscription</h2>
+            <p class="text-sm text-slate-400 mt-1">Create a subscription and let it control the linked license.</p>
+          </div>
 
-      <section id="licensesTab" class="tab-page hidden">
-        <div class="panel rounded-xl p-4 mb-4">
-          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Licenses</h2><p class="text-xs text-slate-400 mt-1">Issue a customer, subscription, and license in one step.</p></div><button id="newLicense" class="rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold px-4 py-2 text-sm">Issue license</button></div>
+          <form id="issueForm" class="panel rounded-2xl p-5 sm:p-6 grid sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2 flex gap-2 p-1 rounded-xl bg-slate-950/30">
+              <button type="button" class="choice active flex-1 rounded-lg px-3 py-2 text-sm" data-customer-mode="existing"><span class="dot"></span>Existing customer</button>
+              <button type="button" class="choice flex-1 rounded-lg px-3 py-2 text-sm text-slate-400" data-customer-mode="new"><span class="dot"></span>New customer</button>
+            </div>
+
+            <div id="existingCustomerFields" class="sm:col-span-2">
+              <label class="text-sm">
+                <span class="block text-xs text-slate-400 mb-1">Select customer</span>
+                <select name="customer_id" id="customerSelect" class="w-full rounded-lg px-3 py-2">
+                  <option value="">Loading customers...</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="newCustomerFields" class="hidden sm:col-span-2 grid sm:grid-cols-2 gap-4">
+              <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Business name</span><input name="customer_name" class="w-full rounded-lg px-3 py-2"></label>
+              <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Email</span><input name="email" type="email" class="w-full rounded-lg px-3 py-2"></label>
+              <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Phone</span><input name="phone" class="w-full rounded-lg px-3 py-2"></label>
+            </div>
+
+            <label class="text-sm">
+              <span class="block text-xs text-slate-400 mb-1">Product</span>
+              <select name="product" class="w-full rounded-lg px-3 py-2">
+                <option value="RESTAURANT_POS">Restaurant POS</option>
+                <option value="FABRIC_POS">Fabric POS</option>
+              </select>
+            </label>
+
+            <div class="sm:col-span-2 border-t border-slate-800/80 pt-4 text-xs text-slate-500">Subscription terms</div>
+
+            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Billing term (months)</span><input name="billing_cycle_months" type="number" min="1" value="1" required class="w-full rounded-lg px-3 py-2"></label>
+            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Auto-renew through</span><input name="auto_renew_until" type="date" class="w-full rounded-lg px-3 py-2"></label>
+            <label class="flex items-center gap-2 text-sm sm:col-span-2"><input name="auto_renew" type="checkbox" checked class="rounded"><span>Enable automatic renewal</span></label>
+            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Price (minor PKR)</span><input name="price_minor" type="number" min="0" class="w-full rounded-lg px-3 py-2"></label>
+            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Machine limit</span><input name="activation_limit" type="number" min="1" value="1" class="w-full rounded-lg px-3 py-2"></label>
+
+            <div class="sm:col-span-2 flex justify-end pt-2">
+              <button class="rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-semibold px-5 py-2.5 shadow-lg shadow-teal-950/20">Issue entitlement</button>
+            </div>
+          </form>
+
+          <div id="issueResult" class="receipt panel rounded-2xl p-5 sm:p-6 mt-4 border-teal-400/30">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-teal-300" id="resultLabel">Issued successfully</div>
+                <h3 class="text-lg font-semibold text-white mt-1" id="resultTitle">License key ready to copy</h3>
+                <p class="text-sm text-slate-400 mt-1" id="resultHint">After issuing, the one-time key will appear here.</p>
+              </div>
+              <button id="dismissResult" type="button" class="text-slate-400 hover:text-white text-xl min-w-11 min-h-11" aria-label="Clear license key">&times;</button>
+            </div>
+            <div class="mt-4 flex flex-col sm:flex-row gap-2">
+              <code id="issuedKey" class="flex-1 min-h-11 flex items-center rounded-lg bg-slate-950/70 border border-slate-700 px-3 py-2 text-sm text-slate-500 break-all select-all">No key issued yet</code>
+              <button id="copyKey" type="button" disabled class="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 text-slate-500 font-semibold px-4 py-2 min-h-11">Copy key</button>
+            </div>
+            <p id="copyStatus" class="text-xs text-teal-300 mt-2 min-h-4"></p>
+          </div>
         </div>
-        <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Customer</th><th class="p-3">Product</th><th class="p-3">Type</th><th class="p-3">Status</th><th class="p-3">Expires</th><th class="p-3">Limit</th><th class="p-3">Actions</th></tr></thead><tbody id="licenses"></tbody></table></div>
       </section>
 
       <section id="subscriptionsTab" class="tab-page hidden">
-        <div class="panel rounded-xl p-4 mb-4">
-          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Subscriptions</h2><p class="text-xs text-slate-400 mt-1">Control billing status, cycle, and next billing date from one table.</p></div><button id="newSubscription" class="rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 text-sm">New subscription</button></div>
+        <div class="mb-5">
+          <h2 class="text-lg font-semibold text-white">Subscriptions</h2>
+          <p class="text-sm text-slate-400 mt-1">The subscription is the source of truth for its linked license.</p>
         </div>
-        <div class="panel rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-slate-400 border-b border-slate-800"><th class="p-3">ID</th><th class="p-3">Customer</th><th class="p-3">Product</th><th class="p-3">Status</th><th class="p-3">Cycle</th><th class="p-3">Next billing</th><th class="p-3">Actions</th></tr></thead><tbody id="subscriptions"></tbody></table></div>
+        <div class="panel rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-400 border-b border-slate-800">
+                <th class="p-3">Subscription</th>
+                <th class="p-3">Customer</th>
+                <th class="p-3">Product</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Term</th>
+                <th class="p-3">Auto-renew</th>
+                <th class="p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody id="subscriptions"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="customersTab" class="tab-page hidden">
+        <div class="mb-5">
+          <h2 class="text-lg font-semibold text-white">Customers</h2>
+          <p class="text-sm text-slate-400 mt-1">Read-only customer and entitlement records.</p>
+        </div>
+        <div class="panel rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-400 border-b border-slate-800">
+                <th class="p-3">Customer ID</th>
+                <th class="p-3">Customer and linked records</th>
+              </tr>
+            </thead>
+            <tbody id="customers"></tbody>
+          </table>
+        </div>
       </section>
     </section>
   </main>
-  <div id="modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 items-center justify-center overflow-y-auto"><div class="panel rounded-2xl p-6 w-full max-w-xl max-h-[calc(100vh-2rem)] flex flex-col shadow-2xl"><div class="flex justify-between items-center mb-5 shrink-0"><h2 id="modalTitle" class="text-lg font-semibold text-white"></h2><button id="closeModal" class="text-slate-400 hover:text-white text-2xl">&times;</button></div><form id="modalForm" class="space-y-4 overflow-y-auto pr-1"></form></div></div>
+
+  <div id="modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 items-center justify-center overflow-y-auto">
+    <div class="modal-card panel rounded-2xl p-6 w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl">
+      <div class="flex justify-between items-center mb-5">
+        <h2 id="modalTitle" class="text-lg font-semibold text-white"></h2>
+        <button id="closeModal" class="text-slate-400 hover:text-white text-2xl min-w-11 min-h-11">&times;</button>
+      </div>
+      <form id="modalForm" class="space-y-4"></form>
+    </div>
+  </div>
+
   <script src="admin.js"></script>
 </body>
 </html>

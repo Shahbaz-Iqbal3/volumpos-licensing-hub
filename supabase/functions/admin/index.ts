@@ -28,8 +28,6 @@ import { addMonths } from '../_shared/licenseSign.ts'
 import { isKnownProduct, DEFAULT_ACTIVATION_LIMIT } from '../_shared/constants.ts'
 
 /** Term tiers mapped to days. A tier is only used when no explicit date is given. */
-const TIER_DAYS: Record<string, number> = { '1y': 365, '2y': 730, '5y': 1825 }
-
 async function nextId(db: ReturnType<typeof serviceClient>, prefix: string, counter: string, width: number): Promise<string> {
   const { data, error } = await db.rpc('next_id', { prefix, counter, width })
   if (error || !data) throw new Error(error?.message || 'id generation failed')
@@ -89,14 +87,21 @@ serve(async (req) => {
       case 'list-customers': {
         const { data, error } = await db.from('customers').select('*').order('created_at', { ascending: false })
         if (error) return respond({ error: error.message }, 500)
-        return respond({ ok: true, customers: data ?? [] })
+        const customers = []
+        for (const customer of data ?? []) {
+          const { data: licenses } = await db.from('licenses').select('*').eq('customer_id', customer.id)
+          const { data: subscriptions } = await db.from('subscriptions').select('*').eq('customer_id', customer.id)
+          customers.push({ ...customer, licenses: licenses ?? [], subscriptions: subscriptions ?? [] })
+        }
+        return respond({ ok: true, customers })
       }
 
       case 'issue-license-bundle': {
         const customerName = typeof body.customer_name === 'string' ? body.customer_name.trim() : ''
+        const existingCustomerId = typeof body.customer_id === 'string' ? body.customer_id.trim() : ''
         const product = typeof body.product === 'string' ? body.product : ''
-        const licenseType = body.license_type === 'subscription' ? 'subscription' : 'perpetual'
-        if (!customerName || !product) return respond({ error: 'customer_name and product are required' }, 400)
+        const licenseType = 'subscription' as const
+        if ((!customerName && !existingCustomerId) || !product) return respond({ error: 'Select an existing customer or provide a new customer name, and choose a product' }, 400)
         if (!isKnownProduct(product)) return respond({ error: `Unknown product ${product}` }, 400)
 
         const activationLimit = Math.max(1, Math.floor(Number(body.activation_limit) || DEFAULT_ACTIVATION_LIMIT))
@@ -105,24 +110,32 @@ serve(async (req) => {
         const durationMonths = Number.isFinite(Number(body.duration_months)) && Number(body.duration_months) > 0
           ? Math.floor(Number(body.duration_months))
           : null
-        const billingCycleMonths = licenseType === 'subscription'
-          ? Math.max(1, Math.floor(Number(body.billing_cycle_months) || durationMonths || 1))
-          : null
+        const billingCycleMonths = Math.max(1, Math.floor(Number(body.billing_cycle_months) || durationMonths || 1))
+        const autoRenew = body.auto_renew !== false
+        const autoRenewUntil = typeof body.auto_renew_until === 'string' && body.auto_renew_until ? body.auto_renew_until : null
 
-        let customerId: string | null = null
+        let customerId: string | null = existingCustomerId || null
+        let createdCustomer = false
         let subscriptionId: string | null = null
         try {
-          customerId = await nextId(db, 'CUST-', 'customer', 4)
-          const customerInsert = await db.from('customers').insert({
-            id: customerId,
-            name: customerName,
-            phone: typeof body.phone === 'string' ? body.phone.trim() || null : null,
-            email: typeof body.email === 'string' ? body.email.trim() || null : null,
-            notes: typeof body.notes === 'string' ? body.notes.trim() || null : null
-          })
-          if (customerInsert.error) throw new Error(customerInsert.error.message)
+          if (customerId) {
+            const { data: existingCustomer, error: customerError } = await db.from('customers').select('id').eq('id', customerId).maybeSingle()
+            if (customerError) throw new Error(customerError.message)
+            if (!existingCustomer) return respond({ error: 'Selected customer was not found' }, 404)
+          } else {
+            customerId = await nextId(db, 'CUST-', 'customer', 4)
+            const customerInsert = await db.from('customers').insert({
+              id: customerId,
+              name: customerName,
+              phone: typeof body.phone === 'string' ? body.phone.trim() || null : null,
+              email: typeof body.email === 'string' ? body.email.trim() || null : null,
+              notes: typeof body.notes === 'string' ? body.notes.trim() || null : null
+            })
+            if (customerInsert.error) throw new Error(customerInsert.error.message)
+            createdCustomer = true
+          }
 
-          if (licenseType === 'subscription') {
+          {
             const subscription = await db.from('subscriptions').insert({
               customer_id: customerId,
               product,
@@ -130,20 +143,16 @@ serve(async (req) => {
               billing_cycle_months: billingCycleMonths,
               price_minor: Number.isFinite(Number(body.price_minor)) ? Math.floor(Number(body.price_minor)) : null,
               currency: typeof body.currency === 'string' ? body.currency : 'PKR',
-              next_billing_date: typeof body.next_billing_date === 'string' ? body.next_billing_date : null
+              next_billing_date: typeof body.next_billing_date === 'string' ? body.next_billing_date : null,
+              auto_renew: autoRenew,
+              auto_renew_until: autoRenewUntil
             }).select('id').maybeSingle()
             if (subscription.error || !subscription.data?.id) throw new Error(subscription.error?.message || 'subscription creation failed')
             subscriptionId = subscription.data.id
           }
 
           let expiresAt: string | null = null
-          if (licenseType === 'subscription') {
-            expiresAt = addMonths(billingCycleMonths || 1).toISOString()
-          } else if (tier && TIER_DAYS[tier] !== undefined) {
-            const date = new Date()
-            date.setDate(date.getDate() + TIER_DAYS[tier]!)
-            expiresAt = date.toISOString()
-          }
+          expiresAt = addMonths(billingCycleMonths).toISOString()
 
           const licenseId = await nextId(db, 'LIC-', 'license', 7)
           const rawKey = generateLicenseKey(productTag(product))
@@ -179,7 +188,7 @@ serve(async (req) => {
           // Best-effort rollback keeps a failed one-click issue from leaving
           // orphan customer/subscription rows behind.
           if (subscriptionId) await db.from('subscriptions').delete().eq('id', subscriptionId)
-          if (customerId) await db.from('customers').delete().eq('id', customerId)
+          if (customerId && createdCustomer) await db.from('customers').delete().eq('id', customerId)
           return respond({ error: String((error as Error)?.message || error) }, 500)
         }
       }
@@ -210,7 +219,7 @@ serve(async (req) => {
       case 'create-license': {
         const customerId = typeof body.customer_id === 'string' ? body.customer_id : ''
         const product = typeof body.product === 'string' ? body.product : ''
-        const licenseType = body.license_type === 'subscription' ? 'subscription' : 'perpetual'
+        const licenseType = 'subscription' as const
         if (!customerId || !product) return respond({ error: 'customer_id and product are required' }, 400)
         if (!isKnownProduct(product)) return respond({ error: `Unknown product ${product}` }, 400)
 
@@ -218,10 +227,19 @@ serve(async (req) => {
         const features = Array.isArray(body.features) ? body.features.filter((f: unknown) => typeof f === 'string') : []
         const tier = typeof body.tier === 'string' ? body.tier : null
         const durationMonths = Number.isFinite(Number(body.duration_months)) ? Math.floor(Number(body.duration_months)) : null
-        const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : null
+        const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
+        if (!subscriptionId) return respond({ error: 'subscription_id is required; use issue-license-bundle for new issuance' }, 400)
+        const { data: subscription, error: subscriptionError } = await db
+          .from('subscriptions')
+          .select('id, customer_id, product')
+          .eq('id', subscriptionId)
+          .eq('customer_id', customerId)
+          .maybeSingle()
+        if (subscriptionError) return respond({ error: subscriptionError.message }, 500)
+        if (!subscription || subscription.product !== product) return respond({ error: 'subscription_id must belong to the customer and product' }, 400)
 
-        // Expiry: an explicit date wins; otherwise a subscription period or a
-        // tier-derived term. Perpetual with no date means "never expires".
+        // Existing perpetual rows remain valid, but every newly-created row is
+        // subscription-backed and receives a finite initial billing term.
         let expiresAt: string | null = null
         if (typeof body.expires_at === 'string' && body.expires_at) {
           const parsed = new Date(body.expires_at)
@@ -230,10 +248,6 @@ serve(async (req) => {
         } else if (licenseType === 'subscription') {
           const months = durationMonths ?? 1
           expiresAt = addMonths(months).toISOString()
-        } else if (tier && TIER_DAYS[tier] !== undefined) {
-          const date = new Date()
-          date.setDate(date.getDate() + TIER_DAYS[tier]!)
-          expiresAt = date.toISOString()
         }
 
         const id = await nextId(db, 'LIC-', 'license', 7)
@@ -277,6 +291,8 @@ serve(async (req) => {
       case 'update-license': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         if (!licenseId) return respond({ error: 'license_id is required' }, 400)
+        const { data: license } = await db.from('licenses').select('subscription_id').eq('id', licenseId).maybeSingle()
+        if (license?.subscription_id) return respond({ error: 'Subscription-backed licenses are controlled by their subscription' }, 409)
         const update: Record<string, unknown> = {}
         if (typeof body.status === 'string') update.status = body.status
         if (body.activation_limit !== undefined) update.activation_limit = Math.max(1, Math.floor(Number(body.activation_limit) || 1))
@@ -291,6 +307,8 @@ serve(async (req) => {
       case 'delete-license': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         if (!licenseId) return respond({ error: 'license_id is required' }, 400)
+        const { data: license } = await db.from('licenses').select('subscription_id').eq('id', licenseId).maybeSingle()
+        if (license?.subscription_id) return respond({ error: 'Delete the subscription instead; subscription-backed licenses are managed automatically' }, 409)
         const { error } = await db.from('licenses').delete().eq('id', licenseId)
         if (error) return respond({ error: error.message }, 500)
         return respond({ ok: true })
@@ -301,6 +319,8 @@ serve(async (req) => {
         const status = typeof body.status === 'string' ? body.status : ''
         const allowed = ['unactivated', 'active', 'suspended', 'expired', 'revoked']
         if (!licenseId || !allowed.includes(status)) return respond({ error: 'license_id and a valid status are required' }, 400)
+        const { data: license } = await db.from('licenses').select('subscription_id').eq('id', licenseId).maybeSingle()
+        if (license?.subscription_id) return respond({ error: 'Subscription-backed licenses are controlled by their subscription' }, 409)
         const { error } = await db.from('licenses').update({ status }).eq('id', licenseId)
         if (error) return respond({ error: error.message }, 500)
         return respond({ ok: true })
@@ -310,6 +330,8 @@ serve(async (req) => {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         const limit = Math.max(1, Math.floor(Number(body.activation_limit) || 1))
         if (!licenseId) return respond({ error: 'license_id is required' }, 400)
+        const { data: license } = await db.from('licenses').select('subscription_id').eq('id', licenseId).maybeSingle()
+        if (license?.subscription_id) return respond({ error: 'Subscription-backed licenses are controlled by their subscription' }, 409)
         const { error } = await db.from('licenses').update({ activation_limit: limit }).eq('id', licenseId)
         if (error) return respond({ error: error.message }, 500)
         return respond({ ok: true })
@@ -331,7 +353,9 @@ serve(async (req) => {
             billing_cycle_months: months,
             price_minor: Number.isFinite(Number(body.price_minor)) ? Math.floor(Number(body.price_minor)) : null,
             currency: typeof body.currency === 'string' ? body.currency : 'PKR',
-            next_billing_date: typeof body.next_billing_date === 'string' ? body.next_billing_date : null
+            next_billing_date: typeof body.next_billing_date === 'string' ? body.next_billing_date : null,
+            auto_renew: body.auto_renew !== false,
+            auto_renew_until: typeof body.auto_renew_until === 'string' && body.auto_renew_until ? body.auto_renew_until : null
           })
           .select('id')
           .maybeSingle()
@@ -374,6 +398,8 @@ serve(async (req) => {
         if (body.billing_cycle_months !== undefined) update.billing_cycle_months = Math.max(1, Math.floor(Number(body.billing_cycle_months) || 1))
         if (body.price_minor !== undefined) update.price_minor = body.price_minor === '' ? null : Math.floor(Number(body.price_minor))
         if (body.next_billing_date !== undefined) update.next_billing_date = body.next_billing_date || null
+        if (body.auto_renew !== undefined) update.auto_renew = body.auto_renew !== false
+        if (body.auto_renew_until !== undefined) update.auto_renew_until = body.auto_renew_until || null
         if (body.currency !== undefined) update.currency = body.currency || 'PKR'
         if (body.status === 'cancelled') update.cancelled_at = new Date().toISOString()
         if (body.status === 'active') update.cancelled_at = null
@@ -386,6 +412,8 @@ serve(async (req) => {
       case 'delete-subscription': {
         const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
         if (!subscriptionId) return respond({ error: 'subscription_id is required' }, 400)
+        const { count } = await db.from('licenses').select('*', { count: 'exact', head: true }).eq('subscription_id', subscriptionId)
+        if ((count ?? 0) > 0) return respond({ error: 'This subscription has linked licenses; cancel it instead of deleting it.' }, 409)
         const { error } = await db.from('subscriptions').delete().eq('id', subscriptionId)
         if (error) return respond({ error: error.message }, 500)
         return respond({ ok: true })
