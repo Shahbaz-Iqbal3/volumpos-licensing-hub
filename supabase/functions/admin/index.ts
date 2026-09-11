@@ -111,7 +111,7 @@ serve(async (req) => {
           ? Math.floor(Number(body.duration_months))
           : null
         const billingCycleMonths = Math.max(1, Math.floor(Number(body.billing_cycle_months) || durationMonths || 1))
-        const autoRenew = body.auto_renew !== false
+        const autoRenew = body.auto_renew === true
         const autoRenewUntil = typeof body.auto_renew_until === 'string' && body.auto_renew_until ? body.auto_renew_until : null
 
         let customerId: string | null = existingCustomerId || null
@@ -354,7 +354,7 @@ serve(async (req) => {
             price_minor: Number.isFinite(Number(body.price_minor)) ? Math.floor(Number(body.price_minor)) : null,
             currency: typeof body.currency === 'string' ? body.currency : 'PKR',
             next_billing_date: typeof body.next_billing_date === 'string' ? body.next_billing_date : null,
-            auto_renew: body.auto_renew !== false,
+            auto_renew: body.auto_renew === true,
             auto_renew_until: typeof body.auto_renew_until === 'string' && body.auto_renew_until ? body.auto_renew_until : null
           })
           .select('id')

@@ -54,6 +54,10 @@
       background-image:repeating-linear-gradient(90deg,rgba(148,163,184,.4) 0 6px, transparent 6px 12px);
     }
 
+    .cycle-option input[type="radio"]:checked + span{
+      border-color:#2dd4bf;background:rgba(45,212,191,.08);color:#ccfbf1;
+    }
+
     @media (max-width:640px){
       main{padding-left:1rem!important;padding-right:1rem!important;padding-top:1.25rem!important}
       #dashboard>header{align-items:flex-start;flex-direction:column;gap:1rem;margin-bottom:1.5rem}
@@ -90,7 +94,7 @@
       <div class="panel rounded-2xl p-7 w-full max-w-sm">
         <div class="seal mb-5">P2S</div>
         <h1 class="text-2xl font-semibold text-white">Licensing ledger</h1>
-        <p class="text-sm text-slate-400 mt-2 mb-7">Sign in to issue and manage VolumPOS entitlements.</p>
+        <p class="text-sm text-slate-400 mt-2 mb-7">Sign in to manage subscriptions and licenses.</p>
         <label class="block text-xs text-slate-400 mb-2">Admin secret</label>
         <input id="loginSecret" type="password" class="w-full rounded-lg px-3 py-2.5 text-sm" autocomplete="current-password" autofocus>
         <button id="loginButton" class="mt-4 w-full rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold py-2.5">Sign in</button>
@@ -99,11 +103,11 @@
     </section>
 
     <section id="dashboard" class="hidden">
-      <header class="flex items-center justify-between mb-8 pb-6 border-b border-slate-800">
+      <header class="flex items-center justify-between mb-6 pb-6 border-b border-slate-800">
         <div>
           <div class="text-xs text-slate-400 mb-1">P2S Registry</div>
           <h1 class="text-2xl font-semibold text-white">Licensing ledger</h1>
-          <p class="text-sm text-slate-400 mt-1">VolumPOS, Restaurant POS, and Fabric POS entitlements.</p>
+          <p class="text-sm text-slate-400 mt-1">VolumPOS, Restaurant POS, and Fabric POS.</p>
         </div>
         <div class="flex gap-2">
           <button id="refresh" class="px-3 py-2 rounded-lg panel text-sm">Refresh</button>
@@ -111,12 +115,14 @@
         </div>
       </header>
 
+      <p class="text-sm text-slate-400 mb-8 max-w-2xl">A subscription controls whether a customer's license is active. Cancel or change a subscription and the license updates on its own — there's nothing to update separately.</p>
+
       <div id="error" class="hidden rounded-lg border border-red-900 bg-red-950/40 p-3 mb-5 text-sm text-red-200"></div>
 
       <div id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8"></div>
 
       <nav class="flex gap-1 border-b border-slate-800 mb-6 overflow-x-auto">
-        <button class="tab active px-4 pb-3 pt-1 text-sm" data-tab="issue">Issue</button>
+        <button class="tab active px-4 pb-3 pt-1 text-sm" data-tab="issue">New subscription</button>
         <button class="tab px-4 pb-3 pt-1 text-sm text-slate-400" data-tab="subscriptions">Subscriptions</button>
         <button class="tab px-4 pb-3 pt-1 text-sm text-slate-400" data-tab="customers">Customers</button>
       </nav>
@@ -124,9 +130,9 @@
       <section id="issueTab" class="tab-page">
         <div class="max-w-2xl">
           <div class="mb-5">
-            <div class="pl-3 border-l-2 border-teal-400 text-sm text-teal-300 mb-3">New entitlement</div>
-            <h2 class="text-2xl font-semibold text-white">Issue subscription</h2>
-            <p class="text-sm text-slate-400 mt-1">Create a subscription and let it control the linked license.</p>
+            <div class="pl-3 border-l-2 border-teal-400 text-sm text-teal-300 mb-3">New subscription</div>
+            <h2 class="text-2xl font-semibold text-white">Create a subscription</h2>
+            <p class="text-sm text-slate-400 mt-1">Pick a customer and a product, then set how it bills.</p>
           </div>
 
           <form id="issueForm" class="panel rounded-2xl p-5 sm:p-6 grid sm:grid-cols-2 gap-4">
@@ -137,7 +143,7 @@
 
             <div id="existingCustomerFields" class="sm:col-span-2">
               <label class="text-sm">
-                <span class="block text-xs text-slate-400 mb-1">Select customer</span>
+                <span class="block text-xs text-slate-400 mb-1">Customer</span>
                 <select name="customer_id" id="customerSelect" class="w-full rounded-lg px-3 py-2">
                   <option value="">Loading customers...</option>
                 </select>
@@ -150,33 +156,60 @@
               <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Phone</span><input name="phone" class="w-full rounded-lg px-3 py-2"></label>
             </div>
 
-            <label class="text-sm">
-              <span class="block text-xs text-slate-400 mb-1">Product</span>
+            <label class="text-sm sm:col-span-2">
+              <span class="block text-xs text-slate-400 mb-1">Which product is this for?</span>
               <select name="product" class="w-full rounded-lg px-3 py-2">
                 <option value="RESTAURANT_POS">Restaurant POS</option>
                 <option value="FABRIC_POS">Fabric POS</option>
               </select>
             </label>
 
-            <div class="sm:col-span-2 border-t border-slate-800/80 pt-4 text-xs text-slate-500">Subscription terms</div>
+            <div class="sm:col-span-2 border-t border-slate-800/80 pt-4 text-xs text-slate-500">Billing</div>
 
-            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Billing term (months)</span><input name="billing_cycle_months" type="number" min="1" value="1" required class="w-full rounded-lg px-3 py-2"></label>
-            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Auto-renew through</span><input name="auto_renew_until" type="date" class="w-full rounded-lg px-3 py-2"></label>
-            <label class="flex items-center gap-2 text-sm sm:col-span-2"><input name="auto_renew" type="checkbox" checked class="rounded"><span>Enable automatic renewal</span></label>
-            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Price (minor PKR)</span><input name="price_minor" type="number" min="0" class="w-full rounded-lg px-3 py-2"></label>
-            <label class="text-sm"><span class="block text-xs text-slate-400 mb-1">Machine limit</span><input name="activation_limit" type="number" min="1" value="1" class="w-full rounded-lg px-3 py-2"></label>
+            <div class="sm:col-span-2">
+              <span class="block text-xs text-slate-400 mb-1">How often does this bill?</span>
+              <div class="flex gap-2 p-1 rounded-xl bg-slate-950/30">
+                <label class="cycle-option flex-1">
+                  <input type="radio" name="billing_cycle" value="monthly" class="sr-only" checked>
+                  <span class="block text-center rounded-lg border border-transparent px-3 py-2 text-sm text-slate-400 cursor-pointer">Monthly</span>
+                </label>
+                <label class="cycle-option flex-1">
+                  <input type="radio" name="billing_cycle" value="yearly" class="sr-only">
+                  <span class="block text-center rounded-lg border border-transparent px-3 py-2 text-sm text-slate-400 cursor-pointer">Yearly</span>
+                </label>
+              </div>
+            </div>
+
+            <label class="flex items-start gap-2 text-sm sm:col-span-2">
+              <input name="auto_renew" type="checkbox" checked class="rounded mt-0.5">
+              <span>
+                <span class="block">Renews automatically</span>
+                <span class="block text-xs text-slate-500 mt-0.5">If you turn this off, the subscription (and its license) will stop at the end of the current cycle unless you renew it by hand.</span>
+              </span>
+            </label>
+
+            <label class="text-sm">
+              <span class="block text-xs text-slate-400 mb-1">Price per cycle (PKR)</span>
+              <input name="price_minor" type="number" min="0" step="1" data-unit="minor" class="w-full rounded-lg px-3 py-2" placeholder="e.g. 150000">
+              <span class="block text-xs text-slate-500 mt-1" id="priceHint">Enter the amount in paisas (Rs 1 = 100). Rs 0.00 shown here.</span>
+            </label>
+
+            <label class="text-sm">
+              <span class="block text-xs text-slate-400 mb-1">Number of devices allowed</span>
+              <input name="activation_limit" type="number" min="1" value="1" class="w-full rounded-lg px-3 py-2">
+            </label>
 
             <div class="sm:col-span-2 flex justify-end pt-2">
-              <button class="rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-semibold px-5 py-2.5 shadow-lg shadow-teal-950/20">Issue entitlement</button>
+              <button class="rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-semibold px-5 py-2.5 shadow-lg shadow-teal-950/20">Create subscription</button>
             </div>
           </form>
 
           <div id="issueResult" class="receipt panel rounded-2xl p-5 sm:p-6 mt-4 border-teal-400/30">
             <div class="flex items-start justify-between gap-4">
               <div>
-                <div class="text-xs uppercase tracking-wide text-teal-300" id="resultLabel">Issued successfully</div>
+                <div class="text-xs uppercase tracking-wide text-teal-300" id="resultLabel">Created successfully</div>
                 <h3 class="text-lg font-semibold text-white mt-1" id="resultTitle">License key ready to copy</h3>
-                <p class="text-sm text-slate-400 mt-1" id="resultHint">After issuing, the one-time key will appear here.</p>
+                <p class="text-sm text-slate-400 mt-1" id="resultHint">Once you create a subscription, its one-time license key appears here.</p>
               </div>
               <button id="dismissResult" type="button" class="text-slate-400 hover:text-white text-xl min-w-11 min-h-11" aria-label="Clear license key">&times;</button>
             </div>
@@ -192,7 +225,7 @@
       <section id="subscriptionsTab" class="tab-page hidden">
         <div class="mb-5">
           <h2 class="text-lg font-semibold text-white">Subscriptions</h2>
-          <p class="text-sm text-slate-400 mt-1">The subscription is the source of truth for its linked license.</p>
+          <p class="text-sm text-slate-400 mt-1">Cancel, pause, or change billing here — the linked license updates automatically.</p>
         </div>
         <div class="panel rounded-xl overflow-x-auto">
           <table class="w-full text-sm">
@@ -202,9 +235,9 @@
                 <th class="p-3">Customer</th>
                 <th class="p-3">Product</th>
                 <th class="p-3">Status</th>
-                <th class="p-3">Term</th>
+                <th class="p-3">Billing cycle</th>
                 <th class="p-3">Auto-renew</th>
-                <th class="p-3">Action</th>
+                <th class="p-3">Manage</th>
               </tr>
             </thead>
             <tbody id="subscriptions"></tbody>
@@ -215,14 +248,14 @@
       <section id="customersTab" class="tab-page hidden">
         <div class="mb-5">
           <h2 class="text-lg font-semibold text-white">Customers</h2>
-          <p class="text-sm text-slate-400 mt-1">Read-only customer and entitlement records.</p>
+          <p class="text-sm text-slate-400 mt-1">Every customer and their subscriptions. View only — make changes from the Subscriptions tab.</p>
         </div>
         <div class="panel rounded-xl overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-slate-400 border-b border-slate-800">
                 <th class="p-3">Customer ID</th>
-                <th class="p-3">Customer and linked records</th>
+                <th class="p-3">Customer and subscriptions</th>
               </tr>
             </thead>
             <tbody id="customers"></tbody>
@@ -243,5 +276,21 @@
   </div>
 
   <script src="admin.js"></script>
+  <script>
+    // Purely cosmetic helper: shows a live PKR preview next to the paisas
+    // input, and keeps the "Monthly / Yearly" segmented control's checked
+    // option visibly highlighted. Does not touch form submission.
+    (function(){
+      var priceInput = document.querySelector('#issueForm input[name="price_minor"]');
+      var priceHint = document.getElementById('priceHint');
+      if (priceInput && priceHint) {
+        priceInput.addEventListener('input', function(){
+          var minor = parseInt(priceInput.value, 10);
+          var rupees = isNaN(minor) ? 0 : minor / 100;
+          priceHint.textContent = 'Enter the amount in paisas (Rs 1 = 100). Rs ' + rupees.toLocaleString('en-PK', {minimumFractionDigits: 2}) + ' shown here.';
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
