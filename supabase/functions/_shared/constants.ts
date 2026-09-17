@@ -7,6 +7,15 @@ export const DEFAULT_ACTIVATION_LIMIT = 1
 
 export const PRODUCTS = ['FABRIC_POS', 'RESTAURANT_POS'] as const
 
+export const PRODUCT_FEATURES: Record<(typeof PRODUCTS)[number], readonly string[]> = {
+  FABRIC_POS: ['custom-orders', 'a4-printing', 'tailoring-profiles', 'fabric-inventory'],
+  RESTAURANT_POS: ['table-service', 'kitchen-display', 'delivery-orders', 'restaurant-reports']
+}
+
+export function isKnownFeature(product: string, feature: string): boolean {
+  return (PRODUCT_FEATURES[product as keyof typeof PRODUCT_FEATURES] ?? []).includes(feature)
+}
+
 /** Products the hub will issue for. */
 export function isKnownProduct(product: string): boolean {
   return (PRODUCTS as readonly string[]).includes(product)

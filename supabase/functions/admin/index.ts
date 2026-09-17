@@ -25,7 +25,7 @@ import { serviceClient, adminSecret, logCheckin } from '../_shared/db.ts'
 import { checkAdminRateLimit, recordAdminAuthFailure } from '../_shared/ratelimit.ts'
 import { generateLicenseKey, hashLicenseKey, keyLast4, productTag } from '../_shared/keys.ts'
 import { addMonths } from '../_shared/licenseSign.ts'
-import { isKnownProduct, DEFAULT_ACTIVATION_LIMIT } from '../_shared/constants.ts'
+import { isKnownProduct, isKnownFeature, DEFAULT_ACTIVATION_LIMIT } from '../_shared/constants.ts'
 
 /** Term tiers mapped to days. A tier is only used when no explicit date is given. */
 async function nextId(db: ReturnType<typeof serviceClient>, prefix: string, counter: string, width: number): Promise<string> {
@@ -107,10 +107,12 @@ serve(async (req) => {
         const activationLimit = Math.max(1, Math.floor(Number(body.activation_limit) || DEFAULT_ACTIVATION_LIMIT))
         const features = Array.isArray(body.features)
           ? body.features.filter((f: unknown) => typeof f === 'string')
-          : [
-              body.feature_custom_orders === true || body.feature_custom_orders === 'on' ? 'custom-orders' : null,
-              body.feature_a4_printing === true || body.feature_a4_printing === 'on' ? 'a4-printing' : null
-            ].filter((f): f is string => Boolean(f))
+          : Object.entries(body)
+              .filter(([key, value]) => key.startsWith('feature_') && (value === true || value === 'on'))
+              .map(([key]) => key.slice('feature_'.length))
+        if (features.some((feature: string) => !isKnownFeature(product, feature))) {
+          return respond({ error: `One or more features are not available for ${product}` }, 400)
+        }
         const tier = typeof body.tier === 'string' && body.tier ? body.tier : null
         const durationMonths = Number.isFinite(Number(body.duration_months)) && Number(body.duration_months) > 0
           ? Math.floor(Number(body.duration_months))
@@ -230,6 +232,9 @@ serve(async (req) => {
 
         const activationLimit = Math.max(1, Math.floor(Number(body.activation_limit) || DEFAULT_ACTIVATION_LIMIT))
         const features = Array.isArray(body.features) ? body.features.filter((f: unknown) => typeof f === 'string') : []
+        if (features.some((feature: string) => !isKnownFeature(product, feature))) {
+          return respond({ error: `One or more features are not available for ${product}` }, 400)
+        }
         const tier = typeof body.tier === 'string' ? body.tier : null
         const durationMonths = Number.isFinite(Number(body.duration_months)) ? Math.floor(Number(body.duration_months)) : null
         const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
