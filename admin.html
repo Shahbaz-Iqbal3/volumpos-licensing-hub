@@ -199,6 +199,15 @@
               <input name="activation_limit" type="number" min="1" value="1" class="w-full rounded-lg px-3 py-2">
             </label>
 
+            <fieldset class="sm:col-span-2">
+              <legend class="block text-xs text-slate-400 mb-2">Feature access for this license</legend>
+              <div class="grid sm:grid-cols-2 gap-2 text-sm">
+                <label class="flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2"><input name="feature_custom_orders" type="checkbox" class="rounded"><span>Custom orders</span></label>
+                <label class="flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2"><input name="feature_a4_printing" type="checkbox" class="rounded"><span>A4 printing</span></label>
+              </div>
+              <p class="text-xs text-slate-500 mt-2">Older licenses without feature data continue to include all features.</p>
+            </fieldset>
+
             <div class="sm:col-span-2 flex justify-end pt-2">
               <button class="rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-semibold px-5 py-2.5 shadow-lg shadow-teal-950/20">Create subscription</button>
             </div>

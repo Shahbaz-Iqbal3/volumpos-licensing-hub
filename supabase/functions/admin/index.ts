@@ -105,7 +105,12 @@ serve(async (req) => {
         if (!isKnownProduct(product)) return respond({ error: `Unknown product ${product}` }, 400)
 
         const activationLimit = Math.max(1, Math.floor(Number(body.activation_limit) || DEFAULT_ACTIVATION_LIMIT))
-        const features = Array.isArray(body.features) ? body.features.filter((f: unknown) => typeof f === 'string') : []
+        const features = Array.isArray(body.features)
+          ? body.features.filter((f: unknown) => typeof f === 'string')
+          : [
+              body.feature_custom_orders === true || body.feature_custom_orders === 'on' ? 'custom-orders' : null,
+              body.feature_a4_printing === true || body.feature_a4_printing === 'on' ? 'a4-printing' : null
+            ].filter((f): f is string => Boolean(f))
         const tier = typeof body.tier === 'string' && body.tier ? body.tier : null
         const durationMonths = Number.isFinite(Number(body.duration_months)) && Number(body.duration_months) > 0
           ? Math.floor(Number(body.duration_months))
