@@ -47,12 +47,15 @@ el('loginSecret').onkeydown = (event) => { if (event.key === 'Enter') el('loginB
 el('refresh').onclick = refreshAll; el('signOut').onclick = signOut; el('closeModal').onclick = closeModal
 let issuedKey = ''
 const PRODUCT_FEATURES = {
-  FABRIC_POS: [['custom-orders', 'Custom orders'], ['a4-printing', 'A4 printing'], ['tailoring-profiles', 'Tailoring profiles'], ['fabric-inventory', 'Fabric inventory']],
-  RESTAURANT_POS: [['table-service', 'Table service'], ['kitchen-display', 'Kitchen display'], ['delivery-orders', 'Delivery orders'], ['restaurant-reports', 'Restaurant reports']]
+  FABRIC_POS: [['custom-orders', 'Custom orders'], ['a4-printing', 'A4 printing']],
+  RESTAURANT_POS: []
 }
 function renderProductFeatures() {
   const product = el('issueForm').product.value
-  el('productFeatures').innerHTML = (PRODUCT_FEATURES[product] || []).map(([value, label]) => `<label class="flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2"><input name="feature_${value}" type="checkbox" class="rounded"><span>${label}</span></label>`).join('')
+  const features = PRODUCT_FEATURES[product] || []
+  el('productFeatures').innerHTML = features.length
+    ? features.map(([value, label]) => `<label class="flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2"><input name="feature_${value}" type="checkbox" class="rounded"><span>${label}</span></label>`).join('')
+    : '<p class="text-xs text-slate-500 sm:col-span-2">No released features are available for this product yet.</p>'
 }
 el('issueForm').product.addEventListener('change', renderProductFeatures)
 renderProductFeatures()

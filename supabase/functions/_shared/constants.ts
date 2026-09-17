@@ -8,8 +8,10 @@ export const DEFAULT_ACTIVATION_LIMIT = 1
 export const PRODUCTS = ['FABRIC_POS', 'RESTAURANT_POS'] as const
 
 export const PRODUCT_FEATURES: Record<(typeof PRODUCTS)[number], readonly string[]> = {
-  FABRIC_POS: ['custom-orders', 'a4-printing', 'tailoring-profiles', 'fabric-inventory'],
-  RESTAURANT_POS: ['table-service', 'kitchen-display', 'delivery-orders', 'restaurant-reports']
+  // Only implemented and production-ready features belong here. Features under
+  // development must not be selectable or accepted by license issuance.
+  FABRIC_POS: ['custom-orders', 'a4-printing'],
+  RESTAURANT_POS: []
 }
 
 export function isKnownFeature(product: string, feature: string): boolean {

@@ -6,6 +6,20 @@ import {
   MAX_FAILED_ATTEMPTS,
   ADMIN_AUTH_ACTION
 } from '../supabase/functions/_shared/ratelimit.ts'
+import { PRODUCT_FEATURES, isKnownFeature } from '../supabase/functions/_shared/constants.ts'
+
+describe('product feature catalog', () => {
+  it('exposes only released Fabric POS features', () => {
+    expect(PRODUCT_FEATURES.FABRIC_POS).toEqual(['custom-orders', 'a4-printing'])
+    expect(isKnownFeature('FABRIC_POS', 'custom-orders')).toBe(true)
+    expect(isKnownFeature('FABRIC_POS', 'tailoring-profiles')).toBe(false)
+  })
+
+  it('does not expose unreleased Restaurant POS features', () => {
+    expect(PRODUCT_FEATURES.RESTAURANT_POS).toEqual([])
+    expect(isKnownFeature('RESTAURANT_POS', 'kitchen-display')).toBe(false)
+  })
+})
 
 describe('timingSafeEqual', () => {
   it('accepts identical strings', () => {
