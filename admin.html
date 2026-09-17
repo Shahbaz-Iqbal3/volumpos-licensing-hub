@@ -164,6 +164,12 @@
               </select>
             </label>
 
+            <fieldset class="sm:col-span-2">
+              <legend class="block text-xs text-slate-400 mb-2">Feature access for this license</legend>
+              <div id="productFeatures" class="grid sm:grid-cols-2 gap-2 text-sm"></div>
+              <p class="text-xs text-slate-500 mt-2">Only implemented and released features for the selected product are available.</p>
+            </fieldset>
+
             <div class="sm:col-span-2 border-t border-slate-800/80 pt-4 text-xs text-slate-500">Billing</div>
 
             <div class="sm:col-span-2">
@@ -198,12 +204,6 @@
               <span class="block text-xs text-slate-400 mb-1">Number of devices allowed</span>
               <input name="activation_limit" type="number" min="1" value="1" class="w-full rounded-lg px-3 py-2">
             </label>
-
-            <fieldset class="sm:col-span-2">
-              <legend class="block text-xs text-slate-400 mb-2">Feature access for this license</legend>
-              <div id="productFeatures" class="grid sm:grid-cols-2 gap-2 text-sm"></div>
-              <p class="text-xs text-slate-500 mt-2">Older licenses without feature data continue to include all features.</p>
-            </fieldset>
 
             <div class="sm:col-span-2 flex justify-end pt-2">
               <button class="rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-semibold px-5 py-2.5 shadow-lg shadow-teal-950/20">Create subscription</button>
