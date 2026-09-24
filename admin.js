@@ -15,7 +15,12 @@ async function api(action, payload = {}) {
   if (!state.secret) throw new Error('Authentication required')
   const response = await fetch(`${state.baseUrl.replace(/\/+$/, '')}/admin`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-secret': state.secret }, body: JSON.stringify({ action, ...payload }) })
   const body = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`)
+  if (!response.ok) {
+    if (action === 'update-license' && response.status === 409 && /subscription-backed licenses are controlled by their subscription/i.test(body.error || '')) {
+      throw new Error('Licensing Hub is running an older admin function. Deploy the latest Supabase migration and admin Edge Function, then retry.')
+    }
+    throw new Error(body.error || `Request failed (${response.status})`)
+  }
   return body
 }
 async function authenticate(secret) { state.secret = secret; await api('stats'); saveSession(); el('login').classList.add('hidden'); el('dashboard').classList.remove('hidden'); await refreshAll() }
