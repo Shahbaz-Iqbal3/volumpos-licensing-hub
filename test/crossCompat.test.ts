@@ -46,6 +46,8 @@ describe('hub signer <-> product verifier', () => {
         sources,
         expiresAt: addDays(365).toISOString(),
         tier: '1y',
+        features: ['multi_branch'],
+        branchLimit: 3,
         activationLimit: 2,
         issuedAt: new Date().toISOString()
       },
@@ -61,6 +63,8 @@ describe('hub signer <-> product verifier', () => {
     if (!result.ok) return
     expect(result.shopName).toBe('Demo Restaurant')
     expect(result.activationLimit).toBe(2)
+    expect(result.payload.branchLimit).toBe(3)
+    expect(result.payload.features).toEqual(['multi_branch'])
     expect(result.payload.lid).toBe('LIC-0000001')
   })
 
@@ -78,6 +82,7 @@ describe('hub signer <-> product verifier', () => {
       features: ['inventory'],
       durationMonths: 6,
       activationLimit: 1,
+      branchLimit: 5,
       issuedAt: '2026-01-01T00:00:00.000Z'
     }
 
@@ -98,6 +103,7 @@ describe('hub signer <-> product verifier', () => {
       features: input.features,
       durationMonths: input.durationMonths,
       activationLimit: input.activationLimit,
+      branchLimit: input.branchLimit,
       issuedAt: input.issuedAt
     }
     const packageKey = signLicense(packagePassword, keys.privateKey)

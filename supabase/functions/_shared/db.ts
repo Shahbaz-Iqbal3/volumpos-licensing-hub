@@ -33,6 +33,7 @@ export type LicenseRow = {
   duration_months: number | null
   features: string[] | null
   activation_limit: number
+  branch_limit?: number
   status: string
   key_hash: string
   key_last4: string

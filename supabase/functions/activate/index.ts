@@ -160,6 +160,7 @@ serve(async (req) => {
         features: license.features ?? undefined,
         durationMonths: license.duration_months ?? undefined,
         activationLimit: license.activation_limit,
+        branchLimit: license.branch_limit ?? undefined,
         issuedAt: now
       },
       signingKey()
@@ -187,6 +188,7 @@ serve(async (req) => {
       tier: license.tier,
       expires_at: entitlement.expiresAt,
       activation_limit: license.activation_limit,
+      branch_limit: license.branch_limit ?? 1,
       reinstated: decision.action === 'reissue'
     })
   } catch (err) {

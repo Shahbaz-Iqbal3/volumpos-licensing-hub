@@ -170,6 +170,12 @@
               <p class="text-xs text-slate-500 mt-2">Only implemented and released features for the selected product are available.</p>
             </fieldset>
 
+            <label class="text-sm sm:col-span-2">
+              <span class="block text-xs text-slate-400 mb-1">Maximum branches</span>
+              <input name="branch_limit" type="number" min="1" max="1000" value="1" class="w-full rounded-lg px-3 py-2">
+              <span class="block text-xs text-slate-500 mt-1">For Restaurant POS, enable the multi-branch feature and set the allowed branch count.</span>
+            </label>
+
             <div class="sm:col-span-2 border-t border-slate-800/80 pt-4 text-xs text-slate-500">Billing</div>
 
             <div class="sm:col-span-2">
@@ -254,7 +260,7 @@
       <section id="customersTab" class="tab-page hidden">
         <div class="mb-5">
           <h2 class="text-lg font-semibold text-white">Customers</h2>
-          <p class="text-sm text-slate-400 mt-1">Every customer and their subscriptions. View only — make changes from the Subscriptions tab.</p>
+          <p class="text-sm text-slate-400 mt-1">Manage customers, subscription billing, and signed license entitlements.</p>
         </div>
         <div class="panel rounded-xl overflow-x-auto">
           <table class="w-full text-sm">

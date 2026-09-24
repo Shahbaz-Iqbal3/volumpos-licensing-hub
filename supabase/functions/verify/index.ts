@@ -101,7 +101,9 @@ serve(async (req) => {
           license_type: license.license_type,
           tier: license.tier,
           status: license.status,
-          activation_limit: license.activation_limit,
+           activation_limit: license.activation_limit,
+           branch_limit: license.branch_limit ?? 1,
+           features: license.features ?? [],
           key_last4: license.key_last4,
           issued_at: license.issued_at,
           expires_at: license.expires_at

@@ -11,7 +11,7 @@ export const PRODUCT_FEATURES: Record<(typeof PRODUCTS)[number], readonly string
   // Only implemented and production-ready features belong here. Features under
   // development must not be selectable or accepted by license issuance.
   FABRIC_POS: ['custom-orders', 'a4-printing'],
-  RESTAURANT_POS: []
+  RESTAURANT_POS: ['multi_branch']
 }
 
 export function isKnownFeature(product: string, feature: string): boolean {

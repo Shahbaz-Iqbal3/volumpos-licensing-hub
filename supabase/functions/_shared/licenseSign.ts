@@ -31,6 +31,7 @@ export type LicensePayloadInput = {
   features?: string[]
   durationMonths?: number
   activationLimit?: number
+  branchLimit?: number
   seats?: number
   issuedAt?: string
   version?: number
@@ -54,6 +55,7 @@ export function toWire(input: LicensePayloadInput): Record<string, unknown> {
   if (input.features && input.features.length > 0) wire.f = input.features
   if (input.durationMonths !== undefined) wire.dm = input.durationMonths
   if (input.activationLimit !== undefined) wire.al = input.activationLimit
+  if (input.branchLimit !== undefined) wire.bl = input.branchLimit
   if (input.seats !== undefined) wire.c = input.seats
   if (input.issuedAt) wire.ia = input.issuedAt
   return wire

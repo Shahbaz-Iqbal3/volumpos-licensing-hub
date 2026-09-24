@@ -7,7 +7,7 @@
 //   list-customers       {}                                      -> customers
 //   create-license       { customer_id, product, license_type,   -> license + raw key
 //                          tier?, duration_months?, features?,
-//                          activation_limit?, expires_at?,
+//                          activation_limit?, branch_limit?, expires_at?,
 //                          subscription_id? }
 //   list-licenses        { customer_id? }
 //   set-license-status   { license_id, status }
@@ -113,6 +113,7 @@ serve(async (req) => {
         if (features.some((feature: string) => !isKnownFeature(product, feature))) {
           return respond({ error: `One or more features are not available for ${product}` }, 400)
         }
+        const branchLimit = features.includes('multi_branch') ? Math.max(1, Math.floor(Number(body.branch_limit) || 1)) : 1
         const tier = typeof body.tier === 'string' && body.tier ? body.tier : null
         const durationMonths = Number.isFinite(Number(body.duration_months)) && Number(body.duration_months) > 0
           ? Math.floor(Number(body.duration_months))
@@ -173,6 +174,7 @@ serve(async (req) => {
             duration_months: durationMonths || billingCycleMonths,
             features,
             activation_limit: activationLimit,
+            branch_limit: branchLimit,
             status: 'unactivated',
             key_hash: keyHash,
             key_last4: keyLast4(rawKey),
@@ -235,6 +237,7 @@ serve(async (req) => {
         if (features.some((feature: string) => !isKnownFeature(product, feature))) {
           return respond({ error: `One or more features are not available for ${product}` }, 400)
         }
+        const branchLimit = features.includes('multi_branch') ? Math.max(1, Math.floor(Number(body.branch_limit) || 1)) : 1
         const tier = typeof body.tier === 'string' ? body.tier : null
         const durationMonths = Number.isFinite(Number(body.duration_months)) ? Math.floor(Number(body.duration_months)) : null
         const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id : ''
@@ -273,6 +276,7 @@ serve(async (req) => {
           duration_months: durationMonths,
           features,
           activation_limit: activationLimit,
+          branch_limit: branchLimit,
           status: 'unactivated',
           key_hash: keyHash,
           key_last4: keyLast4(rawKey),
@@ -301,17 +305,40 @@ serve(async (req) => {
       case 'update-license': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         if (!licenseId) return respond({ error: 'license_id is required' }, 400)
-        const { data: license } = await db.from('licenses').select('subscription_id').eq('id', licenseId).maybeSingle()
-        if (license?.subscription_id) return respond({ error: 'Subscription-backed licenses are controlled by their subscription' }, 409)
+        const { data: license } = await db.from('licenses').select('subscription_id, product, features').eq('id', licenseId).maybeSingle()
+        if (!license) return respond({ error: 'License not found' }, 404)
         const update: Record<string, unknown> = {}
-        if (typeof body.status === 'string') update.status = body.status
-        if (body.activation_limit !== undefined) update.activation_limit = Math.max(1, Math.floor(Number(body.activation_limit) || 1))
-        if (body.expires_at !== undefined) update.expires_at = body.expires_at || null
+        const entitlementEdit = body.features !== undefined || body.branch_limit !== undefined || body.activation_limit !== undefined
+        if (license.subscription_id && !entitlementEdit) return respond({ error: 'Subscription-backed license status and expiry are controlled by the subscription' }, 409)
+        if (body.features !== undefined) {
+          if (!Array.isArray(body.features) || body.features.some((feature: unknown) => typeof feature !== 'string' || !isKnownFeature(license.product, feature))) {
+            return respond({ error: `Invalid feature list for ${license.product}` }, 400)
+          }
+          update.features = [...new Set(body.features)]
+        }
+        const finalFeatures = (update.features as string[] | undefined) ?? license.features ?? []
+        if (body.branch_limit !== undefined || body.features !== undefined) {
+          const branchLimit = !finalFeatures.includes('multi_branch') ? 1 : (body.branch_limit === undefined ? 1 : Number(body.branch_limit))
+          if (!Number.isInteger(branchLimit) || branchLimit < 1 || branchLimit > 1000) return respond({ error: 'branch_limit must be an integer from 1 to 1000' }, 400)
+          update.branch_limit = branchLimit
+        }
+        if (update.features && !(update.features as string[]).includes('multi_branch')) update.branch_limit = 1
+        if (update.features && (update.features as string[]).includes('multi_branch') && body.branch_limit === undefined) {
+          update.branch_limit = Math.max(1, Number(license.branch_limit) || 1)
+        }
+        if (body.activation_limit !== undefined) {
+          const activationLimit = Number(body.activation_limit)
+          if (!Number.isInteger(activationLimit) || activationLimit < 1 || activationLimit > 10000) return respond({ error: 'activation_limit must be an integer from 1 to 10000' }, 400)
+          update.activation_limit = activationLimit
+        }
+        if (!license.subscription_id && typeof body.status === 'string') update.status = body.status
+        if (!license.subscription_id && body.expires_at !== undefined) update.expires_at = body.expires_at || null
         if (body.notes !== undefined) update.notes = body.notes || null
         if (!Object.keys(update).length) return respond({ error: 'No fields to update' }, 400)
         const { error } = await db.from('licenses').update(update).eq('id', licenseId)
         if (error) return respond({ error: error.message }, 500)
-        return respond({ ok: true })
+        await logCheckin(db, { action: 'admin', result: 'ok', reason: `update-license-entitlements ${licenseId}`, ip })
+        return respond({ ok: true, note: 'New entitlements are signed on the next activation or renewal.' })
       }
 
       case 'delete-license': {

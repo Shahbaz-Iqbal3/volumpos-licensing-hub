@@ -126,6 +126,7 @@ serve(async (req) => {
         features: license.features ?? undefined,
         durationMonths: license.duration_months ?? undefined,
         activationLimit: license.activation_limit,
+        branchLimit: license.branch_limit ?? undefined,
         issuedAt: now
       },
       signingKey()
@@ -142,7 +143,8 @@ serve(async (req) => {
       license: signed,
       license_id: license.id,
       expires_at: expiresAt,
-      activation_limit: license.activation_limit
+      activation_limit: license.activation_limit,
+      branch_limit: license.branch_limit ?? 1
     })
   } catch (err) {
     await logCheckin(db, { license_id: licenseId, machine_fingerprint: fingerprint, action: 'renew', result: 'denied', reason: String((err as Error)?.message ?? err), ip })

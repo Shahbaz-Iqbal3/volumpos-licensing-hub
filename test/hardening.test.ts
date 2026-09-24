@@ -15,9 +15,15 @@ describe('product feature catalog', () => {
     expect(isKnownFeature('FABRIC_POS', 'tailoring-profiles')).toBe(false)
   })
 
-  it('does not expose unreleased Restaurant POS features', () => {
-    expect(PRODUCT_FEATURES.RESTAURANT_POS).toEqual([])
+  it('exposes Restaurant multi-branch when released', () => {
+    expect(PRODUCT_FEATURES.RESTAURANT_POS).toEqual(['multi_branch'])
+    expect(isKnownFeature('RESTAURANT_POS', 'multi_branch')).toBe(true)
     expect(isKnownFeature('RESTAURANT_POS', 'kitchen-display')).toBe(false)
+  })
+
+  it('keeps branch entitlement opt-in instead of enabling it on Restaurant licenses by default', () => {
+    expect(isKnownFeature('RESTAURANT_POS', 'multi_branch')).toBe(true)
+    expect(PRODUCT_FEATURES.RESTAURANT_POS).not.toContain('cloud_sync')
   })
 })
 
