@@ -1,17 +1,18 @@
-/** Extra days added to a subscription license beyond its billing cycle, so a
+﻿/** Extra days added to a subscription license beyond its billing cycle, so a
  *  customer who is offline at renewal time keeps working through the gap. */
 export const SUBSCRIPTION_BUFFER_DAYS = 5
 
 /** Default machines per license when the license row does not say. */
 export const DEFAULT_ACTIVATION_LIMIT = 1
 
-export const PRODUCTS = ['FABRIC_POS', 'RESTAURANT_POS'] as const
+export const PRODUCTS = ['FABRIC_POS', 'RESTAURANT_POS', 'MEDICAL_POS'] as const
 
 export const PRODUCT_FEATURES: Record<(typeof PRODUCTS)[number], readonly string[]> = {
   // Only implemented and production-ready features belong here. Features under
   // development must not be selectable or accepted by license issuance.
   FABRIC_POS: ['custom-orders', 'a4-printing'],
-  RESTAURANT_POS: ['multi_branch']
+  RESTAURANT_POS: ['multi_branch'],
+  MEDICAL_POS: ['ocr-scans']
 }
 
 export function isKnownFeature(product: string, feature: string): boolean {
@@ -28,3 +29,12 @@ export function isKnownProduct(product: string): boolean {
 export function requiredSourceMatches(count: number): number {
   return Math.max(1, Math.ceil(count * 0.5))
 }
+
+/** OCR scans included per license per calendar month, before the add-on. */
+export const OCR_FREE_SCANS_PER_MONTH = 10
+
+/** Feature-flag names, checked by hasLicenseFeature('name') on the product
+ *  side and by the hub when issuing/validating a license. */
+export const FEATURE_OCR_SCANS = 'ocr-scans'
+export const FEATURE_OCR_ADDON = 'ocr-addon'
+export const FEATURE_PUSH_RELAY = 'push-relay'
