@@ -30,6 +30,7 @@ serve(async (req) => {
     licenseId = typeof body?.license_id === 'string' ? body.license_id : null
     fingerprint = typeof body?.machine_fingerprint === 'string' ? body.machine_fingerprint : ''
     const shopName = typeof body?.shop_name === 'string' ? body.shop_name : ''
+    const refreshEntitlements = body?.refresh_entitlements === true
     const sources = sanitizeSources(body?.sources)
 
     if (!licenseId || !fingerprint) {
@@ -88,11 +89,11 @@ serve(async (req) => {
       return json({ ok: false, billing: entitlement.billing, error: entitlement.reason })
     }
 
-    if (subscription && subscription.auto_renew === false) {
+    if (!refreshEntitlements && subscription && subscription.auto_renew === false) {
       await logCheckin(db, { license_id: license.id, machine_fingerprint: fingerprint, action: 'renew', result: 'denied', reason: 'Auto-renew disabled', ip })
       return json({ ok: false, billing: true, error: 'Auto-renew is disabled for this subscription' }, 200, req)
     }
-    if (subscription?.auto_renew_until && new Date(subscription.auto_renew_until).getTime() < Date.now()) {
+    if (!refreshEntitlements && subscription?.auto_renew_until && new Date(subscription.auto_renew_until).getTime() < Date.now()) {
       await logCheckin(db, { license_id: license.id, machine_fingerprint: fingerprint, action: 'renew', result: 'denied', reason: 'Auto-renew term ended', ip })
       return json({ ok: false, billing: true, error: 'Auto-renew term has ended' }, 200, req)
     }
@@ -106,10 +107,10 @@ serve(async (req) => {
       billingCycleMonths: subscription?.billing_cycle_months ?? license.duration_months,
       bufferDays: SUBSCRIPTION_BUFFER_DAYS
     })
-    if (!decision.renew) {
+    if (!decision.renew && !refreshEntitlements) {
       return json({ ok: true, renewed: false, expires_at: decision.expiresAt })
     }
-    const expiresAt = decision.expiresAt
+    const expiresAt = refreshEntitlements ? entitlement.expiresAt : decision.expiresAt
 
     const now = new Date().toISOString()
     const signed = await signLicensePayload(
@@ -135,11 +136,12 @@ serve(async (req) => {
     await db.from('licenses').update({ expires_at: expiresAt, last_signature: signed, last_issued_to: fingerprint }).eq('id', license.id)
     await db.from('machine_activations').update({ last_seen_at: now }).eq('id', activation.id)
 
-    await logCheckin(db, { license_id: license.id, machine_fingerprint: fingerprint, action: 'renew', result: 'ok', reason: 'renewed', ip })
+    await logCheckin(db, { license_id: license.id, machine_fingerprint: fingerprint, action: 'renew', result: 'ok', reason: refreshEntitlements ? 'entitlements refreshed' : 'renewed', ip })
 
     return json({
       ok: true,
       renewed: true,
+      refreshed: refreshEntitlements,
       license: signed,
       license_id: license.id,
       expires_at: expiresAt,

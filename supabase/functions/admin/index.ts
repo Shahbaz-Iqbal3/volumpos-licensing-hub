@@ -305,7 +305,7 @@ serve(async (req) => {
       case 'update-license': {
         const licenseId = typeof body.license_id === 'string' ? body.license_id : ''
         if (!licenseId) return respond({ error: 'license_id is required' }, 400)
-        const { data: license } = await db.from('licenses').select('subscription_id, product, features').eq('id', licenseId).maybeSingle()
+        const { data: license } = await db.from('licenses').select('subscription_id, product, features, branch_limit').eq('id', licenseId).maybeSingle()
         if (!license) return respond({ error: 'License not found' }, 404)
         const update: Record<string, unknown> = {}
         const entitlementEdit = body.features !== undefined || body.branch_limit !== undefined || body.activation_limit !== undefined

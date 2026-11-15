@@ -267,6 +267,21 @@ describe('entitlement', () => {
     expect(decision.expiresAt).toBe('2026-10-01T00:00:00Z')
   })
 
+  it('keeps entitlements refresh separate from the paid renewal window', () => {
+    const expiry = '2027-10-01T00:00:00Z'
+    const decision = nextRenewalExpiry({
+      expiresAt: expiry,
+      licenseType: 'subscription',
+      billingCycleMonths: 1,
+      bufferDays: 14,
+      now: new Date('2026-09-24T00:00:00Z')
+    })
+    expect(decision.renew).toBe(false)
+    expect(decision.expiresAt).toBe(expiry)
+    // /renew's refresh_entitlements path signs this current expiry and skips
+    // nextRenewalExpiry's paid-cycle advancement.
+  })
+
   it('extends a subscription one cycle plus buffer inside the window', () => {
     const decision = nextRenewalExpiry({
       expiresAt: '2026-06-03T00:00:00Z',
